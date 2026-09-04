@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-multipart
+yfinance
+feedparser
+beautifulsoup4
+lxml
+google-generativeai
+python-dotenv
+requests
+pillow
+openai
+pytest
+curl-cffi
