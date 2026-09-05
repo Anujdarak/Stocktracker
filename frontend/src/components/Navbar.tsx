@@ -1,6 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
 import {
-  TrendingUp,
   BarChart2,
   Eye,
   Menu,
@@ -12,6 +11,7 @@ import {
   Coins
 } from 'lucide-react';
 import GlobalSearch from './GlobalSearch';
+import ProximityLogo from './ProximityLogo';
 
 const Navbar = () => {
   return (
@@ -20,10 +20,8 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="bg-gradient-to-tr from-emerald-600 to-emerald-400 p-2 rounded-xl group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-emerald-500/25 transition-all duration-300">
-              <TrendingUp size={20} className="text-slate-950 stroke-[2.5]" />
-            </div>
-            <span className="text-xl font-black tracking-tight">Market<span className="text-emerald-400">Pulse</span></span>
+            <ProximityLogo size={22} />
+            <span className="text-xl font-black tracking-tight">Proxi<span className="text-emerald-400">mity</span></span>
           </Link>
 
           {/* Center Search */}

@@ -70,3 +70,60 @@
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
 }
+
+/* Homepage Hero-specific subtle animations (150-300ms range) */
+@keyframes heroFadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-animate-title {
+  animation: heroFadeSlideUp 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hero-animate-subtext {
+  opacity: 0;
+  animation: heroFadeSlideUp 250ms cubic-bezier(0.16, 1, 0.3, 1) 70ms forwards;
+}
+
+.hero-animate-card-1 {
+  opacity: 0;
+  animation: heroCardFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) 120ms forwards;
+}
+
+.hero-animate-card-2 {
+  opacity: 0;
+  animation: heroCardFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) 180ms forwards;
+}
+
+.hero-animate-card-3 {
+  opacity: 0;
+  animation: heroCardFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) 240ms forwards;
+}
+
+.hero-animate-card-4 {
+  opacity: 0;
+  animation: heroCardFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) 300ms forwards;
+}
+
+.hero-animate-cta {
+  opacity: 0;
+  animation: heroFadeSlideUp 220ms cubic-bezier(0.16, 1, 0.3, 1) 320ms forwards;
+}

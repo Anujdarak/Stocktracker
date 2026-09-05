@@ -9,8 +9,10 @@ import {
   Flame,
   Layers,
   ArrowRight,
-  Sparkles,
-  BarChart3
+  BarChart3,
+  Newspaper,
+  ShieldCheck,
+  ArrowDown
 } from 'lucide-react';
 import { VolatilityOutlookWidget } from '../components/VolatilityOutlookWidget';
 import UpcomingActionsPreview from '../components/UpcomingActionsPreview';
@@ -78,8 +80,115 @@ const HomePage: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
 
+      {/* Hero / Intro Section: "Confused About the Stock Market?" */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-950/80 via-slate-900 to-emerald-950/30 border border-indigo-500/25 shadow-xl p-6 sm:p-8">
+        {/* Ambient background glows */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-10 -mb-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 max-w-4xl mx-auto text-center flex flex-col items-center">
+          {/* Headline */}
+          <h1 className="hero-animate-title text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight mb-3">
+            Confused About the Stock Market? <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">You're Not Alone.</span>
+          </h1>
+
+          {/* Subheadline / Body */}
+          <p className="hero-animate-subtext text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl mb-7 font-normal">
+            Already invested but not sure when to exit? Thinking about investing but don't know where to start? Can't make sense of a stock chart? <strong className="text-white font-medium">Proximity</strong> is built to help — explore the sections below and see how.
+          </p>
+
+          {/* 4 Preview Cards (Staggered Entrance Animation) */}
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-7 text-left">
+            {/* Card 1 */}
+            <Link
+              to="/ai-chart-reader"
+              className="hero-animate-card-1 group bg-slate-950/70 hover:bg-slate-900/90 border border-slate-800/90 hover:border-emerald-500/40 rounded-xl p-3.5 transition-colors block"
+            >
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <span className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 group-hover:scale-105 transition-transform duration-150">
+                  <BarChart3 size={18} />
+                </span>
+                <h3 className="text-xs font-bold text-slate-100 group-hover:text-emerald-300 transition-colors">
+                  Understand any chart
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-normal pl-0.5">
+                Upload a screenshot, get a plain-English read.
+              </p>
+            </Link>
+
+            {/* Card 2 */}
+            <Link
+              to="/news-results"
+              className="hero-animate-card-2 group bg-slate-950/70 hover:bg-slate-900/90 border border-slate-800/90 hover:border-blue-500/40 rounded-xl p-3.5 transition-colors block"
+            >
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <span className="p-2 rounded-lg bg-blue-500/15 text-blue-400 group-hover:scale-105 transition-transform duration-150">
+                  <Newspaper size={18} />
+                </span>
+                <h3 className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                  Know what news means
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-normal pl-0.5">
+                Plain-language market impact analysis.
+              </p>
+            </Link>
+
+            {/* Card 3 */}
+            <Link
+              to="/sectors"
+              className="hero-animate-card-3 group bg-slate-950/70 hover:bg-slate-900/90 border border-slate-800/90 hover:border-violet-500/40 rounded-xl p-3.5 transition-colors block"
+            >
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <span className="p-2 rounded-lg bg-violet-500/15 text-violet-400 group-hover:scale-105 transition-transform duration-150">
+                  <Layers size={18} />
+                </span>
+                <h3 className="text-xs font-bold text-slate-100 group-hover:text-violet-300 transition-colors">
+                  Explore by sector
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-normal pl-0.5">
+                Defense, IT, Banking, Auto, and more.
+              </p>
+            </Link>
+
+            {/* Card 4 */}
+            <div className="hero-animate-card-4 bg-slate-950/70 border border-slate-800/90 rounded-xl p-3.5 block">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <span className="p-2 rounded-lg bg-amber-500/15 text-amber-400">
+                  <ShieldCheck size={18} />
+                </span>
+                <h3 className="text-xs font-bold text-slate-100">
+                  100% Free forever
+                </h3>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-normal pl-0.5">
+                Built for genuine learning, not gatekeeping.
+              </p>
+            </div>
+          </div>
+
+          {/* CTA Button ("Explore the Market") */}
+          <div className="hero-animate-cta">
+            <button
+              onClick={() => {
+                const target = document.getElementById('market-snapshot');
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] hover:scale-[1.02] text-slate-950 font-bold rounded-xl text-sm transition-transform duration-150 shadow-lg shadow-emerald-950/40 cursor-pointer"
+            >
+              <span>Explore the Market</span>
+              <ArrowDown size={16} />
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Top Market Snapshot Strip */}
-      <div className="bg-slate-900 text-white rounded-xl p-3 sm:p-4 shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div id="market-snapshot" className="bg-slate-900 text-white rounded-xl p-3 sm:p-4 shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 scroll-mt-6">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b md:border-b-0 md:border-r border-slate-800 pb-2 md:pb-0 md:pr-4">
           <Clock size={14} className="text-emerald-400" />
           <span>Market Snapshot</span>
@@ -142,9 +251,6 @@ const HomePage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-300 text-xs font-semibold mb-3 border border-violet-500/30">
-              <Sparkles size={14} /> AI-Powered Financial Modelling
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
               Stock Market Technicals, <span className="text-emerald-400">Translated Simply</span>.
             </h1>
