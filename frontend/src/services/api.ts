@@ -148,6 +148,16 @@ export const llmService = {
     }
   },
 
+  analyzeFiveDayChart: async (params: { ticker: string; user_query?: string; provider?: string; api_key?: string }) => {
+    try {
+      const { data } = await api.post('/llm/analyze-5day-chart', params);
+      return data.data || data;
+    } catch (error) {
+      console.error("5-day chart analysis error", error);
+      throw error;
+    }
+  },
+
   analyzeNews: async (ticker: string, headlines: string[]) => {
     try {
       const { data } = await api.post('/llm/analyze-news', { ticker, headlines });

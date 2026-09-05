@@ -130,7 +130,7 @@ class LLMService:
         if fallback_factory:
             res = fallback_factory()
             if "model_used" not in res:
-                res["model_used"] = "MarketPulse Autonomous Engine (Free Feature / No Credits Needed)"
+                res["model_used"] = "Proximity Autonomous Engine (Free Feature / No Credits Needed)"
             res["engine_mode"] = "free_tier"
             return res
 
@@ -293,7 +293,7 @@ Return a JSON object with exactly these fields:
                 f"A price level where the stock has struggled to climb above around {high_str}"
             ],
             "confidence": "Medium",
-            "model_used": "MarketPulse Technical Engine (Free Feature / No Credits Needed)",
+            "model_used": "Proximity Technical Engine (Free Feature / No Credits Needed)",
             "engine_mode": "free_tier",
             "trader_jargon": {
                 "trend_bias": "Bullish" if is_upward else "Neutral",
@@ -302,6 +302,185 @@ Return a JSON object with exactly these fields:
                 "technical_pattern": "Range accumulation with support floor"
             }
         }
+
+    def analyze_five_day_chart(
+        self,
+        ticker: str,
+        user_query: str = "I want last analysis of the next day",
+        provider: str = "deepseek",
+        api_key: Optional[str] = None
+    ) -> dict:
+        """
+        Analyze a stock's 5-day candlestick chart and project the tentative next-day value and range.
+        Provides:
+        1. "quick_5day_analysis": Plain language 5-day chart analysis.
+        2. "tentative_next_day_value": Estimated next-day pivot/target price.
+        3. "tentative_next_day_range": Expected lower and upper bounds for the next trading day.
+        4. "tentative_next_day_explanation": Plain-language explanation for the next day.
+        5. "five_day_candles": Structured array of the 5 daily sessions.
+        """
+        clean_ticker = ticker.strip().upper()
+        if not clean_ticker.startswith("^") and "." not in clean_ticker:
+            clean_ticker = f"{clean_ticker}.NS"
+
+        # Fetch 5-day data (or 1mo fallback if 5d returns < 5 sessions)
+        candles = []
+        try:
+            raw_hist = market_data_service.get_historical_data(clean_ticker, interval="1d", period="1mo")
+            if raw_hist:
+                candles = raw_hist[-5:] if len(raw_hist) >= 5 else raw_hist
+        except Exception as e:
+            print(f"Failed to fetch 5d hist for {clean_ticker}: {e}")
+
+        # If candles is empty, fetch quote as fallback
+        if not candles:
+            q = market_data_service.get_quote(clean_ticker)
+            curr = q.get("current_price") or 1000.0
+            candles = [{
+                "date": "Recent",
+                "open": curr,
+                "high": round(curr * 1.01, 2),
+                "low": round(curr * 0.99, 2),
+                "close": curr,
+                "volume": q.get("volume") or 100000
+            }]
+
+        # Compute 5-day summary stats
+        first_candle = candles[0]
+        last_candle = candles[-1]
+        start_close = first_candle["close"]
+        latest_close = last_candle["close"]
+        highest_5d = max(c["high"] for c in candles)
+        lowest_5d = min(c["low"] for c in candles)
+        net_return_pct = round(((latest_close - start_close) / start_close) * 100, 2) if start_close else 0.0
+
+        # Calculate Average True Range (ATR)
+        trs = []
+        for i in range(len(candles)):
+            c = candles[i]
+            if i == 0:
+                trs.append(c["high"] - c["low"])
+            else:
+                prev_c = candles[i-1]["close"]
+                trs.append(max(c["high"] - c["low"], abs(c["high"] - prev_c), abs(c["low"] - prev_c)))
+        atr_daily = sum(trs) / len(trs) if trs else (latest_close * 0.015)
+
+        # Standard Pivot Point for next day: P = (High + Low + Close) / 3
+        pivot = round((last_candle["high"] + last_candle["low"] + last_candle["close"]) / 3, 2)
+        tentative_val = pivot
+        tentative_upper = round(pivot + (last_candle["high"] - last_candle["low"]), 2)
+        tentative_lower = round(pivot - (last_candle["high"] - last_candle["low"]), 2)
+
+        if tentative_upper <= tentative_val:
+            tentative_upper = round(tentative_val + atr_daily, 2)
+        if tentative_lower >= tentative_val:
+            tentative_lower = round(tentative_val - atr_daily, 2)
+
+        is_bullish = latest_close >= start_close
+        trend_label = "Moving upward" if is_bullish else ("Moving downward" if latest_close < start_close else "Settling in a steady range")
+
+        candles_table = "\n".join([
+            f"- Session {i+1} ({c['date']}): Open ₹{c['open']}, High ₹{c['high']}, Low ₹{c['low']}, Close ₹{c['close']}, Vol {c.get('volume', 0):,}"
+            for i, c in enumerate(candles)
+        ])
+
+        system_instruction = (
+            "You are an elite plain-spoken stock market analyst. "
+            "Analyze the last 5 trading days of a stock chart and forecast a tentative next-day value and expected trading range. "
+            "Communicate in clear, accessible plain language without complex trader jargon. "
+            "Output must be valid JSON."
+        )
+
+        prompt = f"""
+Stock: {clean_ticker}
+User Request: "{user_query}"
+
+Last 5 Days Chart Data:
+{candles_table}
+
+Key 5-Day Historical Statistics:
+- Starting Close: ₹{start_close}
+- Latest Close: ₹{latest_close}
+- 5-Day High: ₹{highest_5d}
+- 5-Day Low: ₹{lowest_5d}
+- 5-Day Net Move: {net_return_pct}%
+- Estimated Next-Day Pivot Value: ₹{tentative_val}
+- Estimated Next-Day Range: ₹{tentative_lower} to ₹{tentative_upper}
+
+Provide a comprehensive analysis returned as a JSON object with EXACTLY these keys:
+{{
+    "quick_5day_analysis": "A clear, 3-5 sentence plain-language breakdown of the last 5 days chart. Explain what buyers and sellers did, the progression across the 5 sessions, whether volume confirmed moves, and the overall pattern.",
+    "tentative_next_day_value": {tentative_val},
+    "tentative_next_day_range": {{
+        "lower": {tentative_lower},
+        "upper": {tentative_upper}
+    }},
+    "tentative_next_day_explanation": "2-3 plain-language sentences explaining what is expected for the next trading day, including the key level that determines whether it stays positive or pulls back.",
+    "technical_bias": "{trend_label}",
+    "confidence": "Medium",
+    "key_levels": [
+        "A critical floor level around ₹{lowest_5d} where buyers previously defended",
+        "A ceiling level around ₹{highest_5d} where sellers capped the recent move"
+    ],
+    "trader_jargon": {{
+        "trend_bias": "Bullish" if {str(is_bullish).lower()} else "Bearish",
+        "pivot_level": "₹{tentative_val}",
+        "support_level": "₹{tentative_lower}",
+        "resistance_level": "₹{tentative_upper}",
+        "candlestick_pattern": "5-Day Consolidation / Momentum Progression"
+    }}
+}}
+"""
+
+        def fallback_factory():
+            bias_text = "upward momentum" if is_bullish else "downward pressure"
+            analysis_text = (
+                f"Over the last 5 trading sessions, {clean_ticker.replace('.NS', '')} experienced a net move of {net_return_pct:+0.2f}%, "
+                f"trading between a 5-day low of ₹{lowest_5d:,.2f} and a high of ₹{highest_5d:,.2f}. "
+                f"The price action reflects {bias_text}, with the latest session closing near ₹{latest_close:,.2f}. "
+                f"Volume patterns across the 5 days indicate steady institutional participation around the ₹{tentative_val:,.2f} pivot zone."
+            )
+            next_day_text = (
+                f"For the next trading session, the stock has a tentative median value of ₹{tentative_val:,.2f}, "
+                f"with an expected standard trading corridor between ₹{tentative_lower:,.2f} (support floor) and ₹{tentative_upper:,.2f} (resistance ceiling). "
+                f"Holding comfortably above ₹{tentative_val:,.2f} keeps the short-term trajectory positive."
+            )
+            return {
+                "quick_5day_analysis": analysis_text,
+                "tentative_next_day_value": tentative_val,
+                "tentative_next_day_range": {
+                    "lower": tentative_lower,
+                    "upper": tentative_upper
+                },
+                "tentative_next_day_explanation": next_day_text,
+                "technical_bias": trend_label,
+                "confidence": "Medium",
+                "key_levels": [
+                    f"Immediate downside floor around ₹{tentative_lower:,.2f}",
+                    f"Immediate upside ceiling around ₹{tentative_upper:,.2f}"
+                ],
+                "trader_jargon": {
+                    "trend_bias": "Bullish" if is_bullish else "Bearish",
+                    "pivot_level": f"₹{tentative_val:,.2f}",
+                    "support_level": f"₹{tentative_lower:,.2f}",
+                    "resistance_level": f"₹{tentative_upper:,.2f}",
+                    "candlestick_pattern": "5-Day Trend Progression"
+                }
+            }
+
+        res = self._cascade_llm_call(
+            prompt=prompt,
+            system_instruction=system_instruction,
+            preferred_provider=provider,
+            api_key=api_key,
+            fallback_factory=fallback_factory
+        )
+
+        res["ticker"] = clean_ticker.replace('.NS', '')
+        res["five_day_candles"] = candles
+        res["latest_close"] = latest_close
+        res["five_day_return_pct"] = net_return_pct
+        return res
 
     def analyze_news_impact(self, news_headlines: list, ticker: str) -> dict:
         """

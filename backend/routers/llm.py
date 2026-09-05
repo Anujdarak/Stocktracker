@@ -63,6 +63,29 @@ async def analyze_chart(
             except Exception:
                 pass
 
+class FiveDayAnalysisRequest(BaseModel):
+    ticker: str
+    user_query: Optional[str] = "I want last analysis of the next day"
+    provider: Optional[str] = "deepseek"
+    api_key: Optional[str] = None
+
+@router.post("/analyze-5day-chart")
+async def analyze_5day_chart(payload: FiveDayAnalysisRequest):
+    """
+    Endpoint for 5-Day Chart Analysis & Next-Day Tentative Value projection.
+    Analyzes historical 5-day candlestick trends, price patterns, and forecasts next-day range.
+    """
+    try:
+        result = llm_service.analyze_five_day_chart(
+            ticker=payload.ticker,
+            user_query=payload.user_query or "I want last analysis of the next day",
+            provider=payload.provider or "deepseek",
+            api_key=payload.api_key
+        )
+        return {"status": "success", "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"5-day chart analysis failed: {str(e)}")
+
 @router.post("/analyze-news")
 async def analyze_news_impact(payload: NewsImpactRequest):
     """

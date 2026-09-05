@@ -181,6 +181,18 @@ def test_ipo_tracker():
     # Verify mandatory GMP disclaimer presence
     assert "Unofficial grey market indicator" in data["mainline"][0]["gmp"]["disclaimer"]
 
+def test_analyze_5day_chart():
+    res = client.post("/api/llm/analyze-5day-chart", json={
+        "ticker": "RELIANCE",
+        "user_query": "I want last analysis of the next day"
+    })
+    assert res.status_code == 200
+    data = res.json().get("data", {})
+    assert "quick_5day_analysis" in data
+    assert "tentative_next_day_value" in data
+    assert "tentative_next_day_range" in data
+    assert data["tentative_next_day_range"]["upper"] >= data["tentative_next_day_range"]["lower"]
+    assert len(data.get("five_day_candles", [])) > 0
 
 if __name__ == "__main__":
     tests = [
@@ -202,7 +214,8 @@ if __name__ == "__main__":
         test_vix_volatility_outlook,
         test_corporate_actions_stock,
         test_corporate_actions_upcoming,
-        test_ipo_tracker
+        test_ipo_tracker,
+        test_analyze_5day_chart
     ]
     passed = 0
     for t in tests:
