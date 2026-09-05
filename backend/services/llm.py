@@ -208,7 +208,8 @@ class LLMService:
         )
 
         prompt_template = f"""
-Analyze this stock chart for ticker: {ticker or 'Unknown stock'}.
+Analyze this stock chart image.
+If there is a ticker symbol, stock name, or asset title visible on the chart (for example in the top-left title, header, or watermark), detect it in 'detected_ticker'. Otherwise use 'Chart Analysis'.
 
 {grounded_data_summary}
 
@@ -217,11 +218,12 @@ Additional User Context:
 
 Return a JSON object with exactly these fields:
 {{
+    "detected_ticker": "Stock symbol or name observed on the chart image (e.g. RELIANCE, NIFTY, TCS) or 'Chart Pattern'",
     "technical_bias": "Moving upward" | "Moving downward" | "Settling in a steady range",
     "plain_language_explanation": "2-4 short plain sentences summarizing what the chart and recent prices show.",
     "key_levels": [
-        "A price level where the stock has struggled to fall below around ₹X",
-        "A price level where the stock has struggled to climb above around ₹Y"
+        "A price level where the stock has struggled to fall below around ₹X (or price X)",
+        "A price level where the stock has struggled to climb above around ₹Y (or price Y)"
     ],
     "confidence": "Low" | "Medium" | "High",
     "model_used": "Model Name",
@@ -286,6 +288,7 @@ Return a JSON object with exactly these fields:
         bias = "Moving upward" if is_upward else "Settling in a steady range"
 
         return {
+            "detected_ticker": ticker or "Chart Pattern",
             "technical_bias": bias,
             "plain_language_explanation": f"The stock has been trading between {low_str} and {high_str}, currently holding near {last_str}. The price action indicates steady support at the lower bound with modest accumulation.",
             "key_levels": [

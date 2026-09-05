@@ -18,7 +18,7 @@ import { VolatilityOutlookWidget } from '../components/VolatilityOutlookWidget';
 import UpcomingActionsPreview from '../components/UpcomingActionsPreview';
 
 const TRENDING_STOCKS = [
-  { symbol: 'ZOMATO', name: 'Zomato' },
+  { symbol: 'ITC', name: 'ITC' },
   { symbol: 'RELIANCE', name: 'Reliance' },
   { symbol: 'TATASTEEL', name: 'Tata Steel' },
   { symbol: 'HDFCBANK', name: 'HDFC Bank' },

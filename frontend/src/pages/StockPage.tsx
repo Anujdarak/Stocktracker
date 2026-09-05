@@ -75,8 +75,23 @@ const StockPage: React.FC = () => {
             high: Number(candle.high),
             low: Number(candle.low),
             close: Number(candle.close),
+            volume: candle.volume != null ? Number(candle.volume) : undefined,
           }));
         setHistory(formattedHistory);
+
+        // Fallback current_price and change if quote was limited but candles exist
+        if (quoteData && quoteData.current_price == null && formattedHistory.length > 0) {
+          const lastCandle = formattedHistory[formattedHistory.length - 1];
+          quoteData.current_price = lastCandle.close;
+          if (formattedHistory.length > 1) {
+            const prevCandle = formattedHistory[formattedHistory.length - 2];
+            quoteData.previous_close = prevCandle.close;
+            quoteData.change = Number((lastCandle.close - prevCandle.close).toFixed(2));
+            quoteData.change_percent = Number(((quoteData.change / prevCandle.close) * 100).toFixed(2));
+          }
+        }
+
+        setQuote(quoteData);
 
         setNews(newsData || []);
         setPeers(peerData || []);
@@ -106,6 +121,7 @@ const StockPage: React.FC = () => {
           high: Number(candle.high),
           low: Number(candle.low),
           close: Number(candle.close),
+          volume: candle.volume != null ? Number(candle.volume) : undefined,
         }));
       setHistory(formatted);
     } catch (err) {
@@ -147,9 +163,18 @@ const StockPage: React.FC = () => {
     );
   }
 
-  const isLimited = quote.status === 'limited_data' || quote.current_price === null;
+  const isLimited = (quote.status === 'limited_data' || quote.current_price === null) && history.length === 0;
   const isUp = (quote.change || 0) >= 0;
   const colorClass = isUp ? 'text-emerald-600' : 'text-rose-600';
+
+  // Fallbacks for key stats from historical candles if quote fields are null
+  const fallbackHigh = history.length > 0 ? Math.max(...history.map(c => c.high)) : null;
+  const fallbackLow = history.length > 0 ? Math.min(...history.map(c => c.low)) : null;
+  const fallbackVolume = history.length > 0 ? history[history.length - 1]?.volume : null;
+
+  const display52High = quote['52_week_high'] ?? fallbackHigh;
+  const display52Low = quote['52_week_low'] ?? fallbackLow;
+  const displayVolume = quote.volume ?? fallbackVolume;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -314,21 +339,21 @@ const StockPage: React.FC = () => {
               <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800/80">
                 <span className="text-xs text-slate-400 font-medium">Trading Volume</span>
                 <p className="font-mono font-bold text-base text-white mt-0.5">
-                  {quote.volume ? Number(quote.volume).toLocaleString('en-IN') : '—'}
+                  {displayVolume ? Number(displayVolume).toLocaleString('en-IN') : '—'}
                 </p>
               </div>
 
               <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800/80">
                 <span className="text-xs text-slate-400 font-medium">52-Week High</span>
                 <p className="font-mono font-bold text-base text-emerald-400 mt-0.5">
-                  {quote['52_week_high'] ? `₹${quote['52_week_high'].toLocaleString('en-IN')}` : '—'}
+                  {display52High ? `₹${display52High.toLocaleString('en-IN')}` : '—'}
                 </p>
               </div>
 
               <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800/80">
                 <span className="text-xs text-slate-400 font-medium">52-Week Low</span>
                 <p className="font-mono font-bold text-base text-rose-400 mt-0.5">
-                  {quote['52_week_low'] ? `₹${quote['52_week_low'].toLocaleString('en-IN')}` : '—'}
+                  {display52Low ? `₹${display52Low.toLocaleString('en-IN')}` : '—'}
                 </p>
               </div>
 

@@ -26,6 +26,15 @@ class MarketDataService:
         "SENSEX": "SENSEX"
     }
 
+    # Ticker aliases mapping renamed or demerged corporate symbols to their active NSE tickers
+    TICKER_ALIASES = {
+        "ETERNAL": "ETERNAL.NS",
+        "TATAMOTORS.NS": "TMPV.NS",
+        "TATAMOTORS": "TMPV.NS",
+        "TATAMTRDVR.NS": "TMPV.NS",
+        "TATAMTRDVR": "TMPV.NS",
+    }
+
     # Curated ~28 stock shortlist for homepage widgets and top movers
     CURATED_SHORTLIST = [
         "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS",
@@ -306,8 +315,12 @@ class MarketDataService:
     def get_quote(self, ticker: str) -> Dict[str, Any]:
         """Fetch a single stock quote given a ticker symbol (e.g., RELIANCE.NS or ^NSEI)."""
         clean_ticker = ticker.strip().upper()
-        if not clean_ticker.startswith("^") and "." not in clean_ticker:
+        if clean_ticker in self.TICKER_ALIASES:
+            clean_ticker = self.TICKER_ALIASES[clean_ticker]
+        elif not clean_ticker.startswith("^") and "." not in clean_ticker:
             clean_ticker = f"{clean_ticker}.NS"
+            if clean_ticker in self.TICKER_ALIASES:
+                clean_ticker = self.TICKER_ALIASES[clean_ticker]
 
         cached = self._get_cached_quote(clean_ticker)
         if cached:
@@ -321,54 +334,128 @@ class MarketDataService:
             except Exception:
                 info = {}
 
-            # Handle yfinance missing info or empty response via history fallback
-            current_price = info.get('currentPrice') or info.get('regularMarketPrice')
-            prev_close = info.get('previousClose')
+            # Fast info helper (fast, highly reliable, and never rate-blocked)
+            fast = getattr(stock, 'fast_info', {})
+            def get_fast(attr):
+                try:
+                    if hasattr(fast, attr):
+                        val = getattr(fast, attr)
+                        if val is not None and not (isinstance(val, float) and (math.isnan(val) or math.isinf(val))):
+                            return val
+                    elif isinstance(fast, dict) and attr in fast:
+                        val = fast[attr]
+                        if val is not None and not (isinstance(val, float) and (math.isnan(val) or math.isinf(val))):
+                            return val
+                except Exception:
+                    pass
+                return None
+
+            # Current price and previous close
+            current_price = (
+                info.get('currentPrice') or
+                info.get('regularMarketPrice') or
+                get_fast('lastPrice')
+            )
+            prev_close = (
+                info.get('previousClose') or
+                get_fast('previousClose')
+            )
+
+            hist = None
+            if current_price is None or prev_close is None:
+                try:
+                    hist = stock.history(period="1mo")
+                    if not hist.empty:
+                        last_quote = hist.iloc[-1]
+                        prev_quote = hist.iloc[-2] if len(hist) > 1 else last_quote
+                        current_price = float(last_quote['Close'])
+                        prev_close = float(prev_quote['Close'])
+                except Exception:
+                    pass
 
             if current_price is None or prev_close is None:
-                hist = stock.history(period="5d")
-                if not hist.empty:
-                    last_quote = hist.iloc[-1]
-                    prev_quote = hist.iloc[-2] if len(hist) > 1 else last_quote
-                    current_price = float(last_quote['Close'])
-                    prev_close = float(prev_quote['Close'])
-                else:
-                    # Obscure or illiquid stock with no recent data
-                    fallback_data = {
-                        "symbol": clean_ticker,
-                        "shortName": info.get('shortName') or clean_ticker.replace('.NS', ''),
-                        "current_price": None,
-                        "previous_close": None,
-                        "change": 0.0,
-                        "change_percent": 0.0,
-                        "status": "limited_data",
-                        "message": "Limited trading data available for this security on free feeds."
-                    }
-                    self._set_cached_quote(clean_ticker, fallback_data)
-                    return fallback_data
+                fallback_data = {
+                    "symbol": clean_ticker,
+                    "shortName": info.get('shortName') or clean_ticker.replace('.NS', ''),
+                    "current_price": None,
+                    "previous_close": None,
+                    "change": 0.0,
+                    "change_percent": 0.0,
+                    "status": "limited_data",
+                    "message": "Limited trading data available for this security on free feeds."
+                }
+                self._set_cached_quote(clean_ticker, fallback_data)
+                return fallback_data
 
             change = current_price - prev_close if current_price and prev_close else 0.0
             change_pct = (change / prev_close * 100) if prev_close else 0.0
+
+            # Market Capitalization
+            market_cap = info.get('marketCap') or get_fast('marketCap')
+
+            # 52-Week High and Low
+            high_52 = info.get('fiftyTwoWeekHigh') or get_fast('yearHigh')
+            low_52 = info.get('fiftyTwoWeekLow') or get_fast('yearLow')
+
+            # Trading Volume
+            volume = (
+                info.get('volume') or
+                info.get('regularMarketVolume') or
+                get_fast('lastVolume') or
+                get_fast('threeMonthAverageVolume')
+            )
+
+            # If 52-week levels or volume are still missing, compute from 1-year historical prices
+            if high_52 is None or low_52 is None or volume is None:
+                if hist is None or hist.empty:
+                    try:
+                        hist = stock.history(period="1y")
+                    except Exception:
+                        hist = None
+                if hist is not None and not hist.empty:
+                    if high_52 is None and 'High' in hist:
+                        high_52 = float(hist['High'].max())
+                    if low_52 is None and 'Low' in hist:
+                        low_52 = float(hist['Low'].min())
+                    if volume is None and 'Volume' in hist:
+                        volume = int(hist['Volume'].iloc[-1])
+
+            # P/E Ratio (trailing, forward, or derived)
+            pe_ratio = info.get('trailingPE') or info.get('forwardPE')
+            if pe_ratio is None and current_price:
+                trailing_eps = info.get('trailingEps') or info.get('forwardEps')
+                if trailing_eps and trailing_eps > 0:
+                    pe_ratio = current_price / trailing_eps
+
+            # P/B Ratio (price to book or derived)
+            pb_ratio = info.get('priceToBook')
+            if pb_ratio is None and current_price:
+                book_val = info.get('bookValue')
+                if book_val and book_val > 0:
+                    pb_ratio = current_price / book_val
 
             def safe_float(val):
                 if val is None or math.isnan(val) or math.isinf(val):
                     return None
                 return round(float(val), 2)
 
+            # Friendly short name
+            display_name = info.get('shortName') or info.get('longName') or clean_ticker.replace('.NS', '')
+
             data = {
                 "symbol": clean_ticker,
-                "shortName": info.get('shortName') or info.get('longName') or clean_ticker.replace('.NS', ''),
+                "shortName": display_name,
                 "current_price": safe_float(current_price),
                 "previous_close": safe_float(prev_close),
                 "change": safe_float(change),
                 "change_percent": safe_float(change_pct),
-                "market_cap": info.get('marketCap'),
-                "pe_ratio": safe_float(info.get('trailingPE')),
-                "pb_ratio": safe_float(info.get('priceToBook')),
+                "market_cap": market_cap,
+                "pe_ratio": safe_float(pe_ratio),
+                "pb_ratio": safe_float(pb_ratio),
                 "dividend_yield": safe_float(info.get('dividendYield')),
-                "52_week_high": safe_float(info.get('fiftyTwoWeekHigh')),
-                "52_week_low": safe_float(info.get('fiftyTwoWeekLow')),
-                "volume": info.get('volume') or info.get('regularMarketVolume'),
+                "52_week_high": safe_float(high_52),
+                "52_week_low": safe_float(low_52),
+                "volume": volume,
                 "status": "success"
             }
 
@@ -495,8 +582,12 @@ class MarketDataService:
         period: 1mo, 3mo, 1y, 5y, max, etc.
         """
         clean_ticker = ticker.strip().upper()
-        if not clean_ticker.startswith("^") and "." not in clean_ticker:
+        if clean_ticker in MarketDataService.TICKER_ALIASES:
+            clean_ticker = MarketDataService.TICKER_ALIASES[clean_ticker]
+        elif not clean_ticker.startswith("^") and "." not in clean_ticker:
             clean_ticker = f"{clean_ticker}.NS"
+            if clean_ticker in MarketDataService.TICKER_ALIASES:
+                clean_ticker = MarketDataService.TICKER_ALIASES[clean_ticker]
 
         stock = yf.Ticker(clean_ticker)
         hist = stock.history(interval=interval, period=period)

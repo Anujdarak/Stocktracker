@@ -11,10 +11,10 @@ class PortfolioService:
 
     SAMPLE_PORTFOLIOS = {
         "tech_growth": {
-            "name": "Tech & Quick-Commerce Growth",
-            "description": "High-growth consumer internet and software export companies",
+            "name": "Tech & Enterprise Growth",
+            "description": "High-growth consumer and software export companies",
             "holdings": [
-                {"ticker": "ZOMATO", "quantity": 500},
+                {"ticker": "ITC", "quantity": 500},
                 {"ticker": "INFY", "quantity": 50},
                 {"ticker": "TCS", "quantity": 25},
                 {"ticker": "PAYTM", "quantity": 100}

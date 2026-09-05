@@ -28,7 +28,7 @@ const SAMPLE_QUERIES = [
 const POPULAR_COMPANIES = [
   { symbol: 'RELIANCE', name: 'Reliance' },
   { symbol: 'TCS', name: 'TCS' },
-  { symbol: 'ZOMATO', name: 'Zomato' },
+  { symbol: 'TITAN', name: 'Titan' },
   { symbol: 'INFY', name: 'Infosys' },
   { symbol: 'TATAMOTORS', name: 'Tata Motors' }
 ];
@@ -213,7 +213,7 @@ const NewsResultsPage: React.FC = () => {
                     setTickerSearchQuery(e.target.value);
                     setTicker(e.target.value.split(' ')[0]);
                   }}
-                  placeholder="Search stock e.g. RELIANCE, TCS, ZOMATO..."
+                  placeholder="Search stock e.g. RELIANCE, TCS, TITAN..."
                   className="w-full pl-9 pr-3.5 py-2 text-sm font-mono font-bold bg-slate-950/90 border border-slate-700/80 rounded-xl focus:outline-none focus:border-emerald-500 text-white placeholder-slate-500"
                 />
               </div>

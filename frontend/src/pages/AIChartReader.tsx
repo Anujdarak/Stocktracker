@@ -27,6 +27,7 @@ interface AnalysisResult {
   confidence: string;
   key_levels: string[];
   model_used?: string;
+  detected_ticker?: string;
   trader_jargon?: {
     trend_bias?: string;
     support_level?: string;
@@ -54,12 +55,6 @@ interface AnalysisResult {
   five_day_return_pct?: number;
 }
 
-const POPULAR_PROMPTS = [
-  "I want last analysis of the next day",
-  "Expected next-day trading range & key levels",
-  "Is the 5-day trend building momentum?"
-];
-
 const AIChartReader: React.FC = () => {
   const location = useLocation();
   const defaultTicker = (location.state as any)?.defaultTicker || '';
@@ -69,9 +64,6 @@ const AIChartReader: React.FC = () => {
   const [tickerSearchQuery, setTickerSearchQuery] = useState(defaultTicker);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-
-  // User question / prompt for 5-day next day analysis
-  const [userQuery, setUserQuery] = useState('I want last analysis of the next day');
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -130,7 +122,7 @@ const AIChartReader: React.FC = () => {
       return;
     }
     if (activeMode === '5day' && !ticker.trim()) {
-      setError("Please type or select an NSE stock ticker (e.g. RELIANCE, TCS, ZOMATO).");
+      setError("Please type or select an NSE stock ticker (e.g. RELIANCE, TCS, TITAN).");
       return;
     }
 
@@ -143,7 +135,7 @@ const AIChartReader: React.FC = () => {
         const cleanTicker = ticker.split(' ')[0].trim().toUpperCase();
         const response = await llmService.analyzeFiveDayChart({
           ticker: cleanTicker,
-          user_query: userQuery.trim() || "I want last analysis of the next day",
+          user_query: "5-day chart analysis and tentative next day value projection",
           provider,
           api_key: customApiKey.trim() || undefined
         });
@@ -167,9 +159,6 @@ const AIChartReader: React.FC = () => {
       } else {
         const formData = new FormData();
         formData.append('image', selectedImage!);
-        if (ticker) {
-          formData.append('ticker', ticker.toUpperCase());
-        }
         formData.append('provider', provider);
         if (customApiKey.trim()) {
           formData.append('api_key', customApiKey.trim());
@@ -183,7 +172,8 @@ const AIChartReader: React.FC = () => {
           confidence: response.confidence || 'Medium',
           key_levels: Array.isArray(response.key_levels) ? response.key_levels : [response.key_levels].filter(Boolean),
           model_used: response.model_used || (provider === 'deepseek' ? 'DeepSeek (V3/R1 Real-time Analysis)' : 'Google Gemini 2.5 Flash'),
-          trader_jargon: response.trader_jargon || {}
+          trader_jargon: response.trader_jargon || {},
+          detected_ticker: response.detected_ticker
         });
       }
     } catch (err: any) {
@@ -296,102 +286,79 @@ const AIChartReader: React.FC = () => {
             </div>
           </div>
 
-          {/* Stock Ticker Search Autocomplete */}
-          <div className="relative">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Stock Ticker / Company Name (NSE) {activeMode === '5day' && <span className="text-emerald-400">*</span>}
-            </label>
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-3 text-slate-400" />
-              <input
-                type="text"
-                value={tickerSearchQuery}
-                onChange={(e) => {
-                  setTickerSearchQuery(e.target.value);
-                  setTicker(e.target.value.split(' ')[0]);
-                }}
-                placeholder="e.g. ZOMATO, RELIANCE, TCS, TITAN..."
-                className="w-full pl-9 pr-4 py-2 text-sm bg-slate-950/90 border border-slate-700/80 rounded-xl focus:outline-none focus:border-emerald-500 text-white placeholder-slate-400"
-              />
-            </div>
-
-            {/* Dropdown suggestions */}
-            {showDropdown && searchResults.length > 0 && (
-              <div className="absolute z-20 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
-                {searchResults.map((item, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => selectStock(item.symbol, item.name)}
-                    className="w-full px-3.5 py-2.5 text-left text-xs hover:bg-slate-800/80 flex items-center justify-between transition-colors cursor-pointer"
-                  >
-                    <div>
-                      <span className="font-bold text-white">{item.symbol}</span>
-                      <span className="text-slate-400 block truncate max-w-[200px]">{item.name}</span>
-                    </div>
-                    <span className="text-[10px] text-emerald-400 bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded font-bold">Select</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Mode 1: 5-Day Analysis Request Prompt */}
+          {/* Mode 1: 5-Day & Next-Day Mode (Search Stock + Info Card) */}
           {activeMode === '5day' ? (
-            <div className="space-y-3">
-              <div>
+            <div className="space-y-4">
+              {/* Stock Ticker Search Autocomplete */}
+              <div className="relative">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Your Analysis Request
+                  Stock Ticker / Company Name (NSE) <span className="text-emerald-400">*</span>
                 </label>
-                <textarea
-                  value={userQuery}
-                  onChange={(e) => setUserQuery(e.target.value)}
-                  rows={2}
-                  placeholder="e.g. I want last analysis of the next day"
-                  className="w-full p-3 text-sm bg-slate-950/90 border border-slate-700/80 rounded-xl focus:outline-none focus:border-emerald-500 text-white placeholder-slate-400 resize-none"
-                />
-              </div>
-
-              {/* Quick suggestion chips */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Quick Prompts:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {POPULAR_PROMPTS.map((promptText, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setUserQuery(promptText)}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all text-left ${
-                        userQuery === promptText
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
-                      }`}
-                    >
-                      {promptText}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={tickerSearchQuery}
+                    onChange={(e) => {
+                      setTickerSearchQuery(e.target.value);
+                      setTicker(e.target.value.split(' ')[0]);
+                    }}
+                    placeholder="e.g. RELIANCE, TCS, INFY, TITAN..."
+                    className="w-full pl-9 pr-4 py-2 text-sm bg-slate-950/90 border border-slate-700/80 rounded-xl focus:outline-none focus:border-emerald-500 text-white placeholder-slate-400"
+                  />
                 </div>
+
+                {/* Dropdown suggestions */}
+                {showDropdown && searchResults.length > 0 && (
+                  <div className="absolute z-20 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+                    {searchResults.map((item, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => selectStock(item.symbol, item.name)}
+                        className="w-full px-3.5 py-2.5 text-left text-xs hover:bg-slate-800/80 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div>
+                          <span className="font-bold text-white">{item.symbol}</span>
+                          <span className="text-slate-400 block truncate max-w-[200px]">{item.name}</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-400 bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded font-bold">Select</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="p-3 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-[11px] text-slate-300 leading-relaxed">
-                💡 <strong className="text-indigo-300 font-semibold">How it works:</strong> Fetches the last 5 trading days of daily OHLCV candlestick data directly from NSE, identifies momentum patterns, and calculates tentative next-day pivot values and expected trading ranges.
+              {/* 5-Day Analysis Information Card */}
+              <div className="p-4 bg-indigo-950/20 border border-indigo-500/30 rounded-xl text-xs text-slate-300 leading-relaxed space-y-2">
+                <div className="flex items-center gap-2 font-bold text-emerald-300">
+                  <LineChart size={16} className="text-emerald-400" />
+                  <span>Automated 5-Day & Next-Day Prediction</span>
+                </div>
+                <p className="text-[12px] text-slate-300">
+                  Search or select an NSE stock above and click the button below. Proximity automatically evaluates the last 5 trading days of candles to deliver:
+                </p>
+                <ul className="text-[11.5px] text-slate-400 space-y-1 list-disc list-inside">
+                  <li><strong className="text-slate-200">5-Day Chart Analysis:</strong> Plain-English read of buyer/seller dynamics and momentum.</li>
+                  <li><strong className="text-slate-200">Next-Day Forecast:</strong> Tentative next-day price target and expected trading range.</li>
+                </ul>
               </div>
             </div>
           ) : (
-            /* Mode 2: Screenshot Upload Zone */
-            <div>
+            /* Mode 2: Screenshot Upload Zone (No stock ticker or company name needed!) */
+            <div className="space-y-2">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Chart Screenshot <span className="text-blue-400">*</span>
               </label>
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className={`relative group cursor-pointer border-2 border-dashed rounded-xl overflow-hidden transition-all duration-200 min-h-[190px] flex flex-col items-center justify-center p-4 bg-slate-950/70 hover:bg-slate-800/40 hover:border-slate-600 ${
+                className={`relative group cursor-pointer border-2 border-dashed rounded-xl overflow-hidden transition-all duration-200 min-h-[210px] flex flex-col items-center justify-center p-4 bg-slate-950/70 hover:bg-slate-800/40 hover:border-slate-600 ${
                   imagePreview ? 'border-emerald-500/40 bg-emerald-950/20' : 'border-slate-800'
                 }`}
               >
                 {imagePreview ? (
                   <div className="w-full relative">
-                    <img src={imagePreview} alt="Chart preview" className="w-full max-h-48 object-contain rounded-lg mx-auto" />
+                    <img src={imagePreview} alt="Chart preview" className="w-full max-h-52 object-contain rounded-lg mx-auto" />
                     <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg backdrop-blur-xs">
                       <p className="text-white text-xs font-bold flex items-center gap-1.5 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-700">
                         <Upload size={14} /> Click to Replace Screenshot
@@ -399,12 +366,17 @@ const AIChartReader: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center space-y-2">
+                  <div className="text-center space-y-2.5">
                     <div className="w-12 h-12 bg-slate-900 rounded-full shadow-xs border border-slate-800 flex items-center justify-center mx-auto text-slate-400 group-hover:text-emerald-400 transition-colors">
                       <ImageIcon size={22} />
                     </div>
-                    <p className="text-xs font-semibold text-slate-200">Click or drop a chart screenshot</p>
-                    <p className="text-[11px] text-slate-400">PNG, JPG, or WebP from TradingView, Zerodha, etc.</p>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-200">Click or drop any chart screenshot here</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Supports PNG, JPG, or WebP from TradingView, Zerodha, Groww, etc.</p>
+                    </div>
+                    <span className="inline-block text-[10px] text-blue-400 bg-blue-950/60 border border-blue-800/60 px-2.5 py-1 rounded-full font-semibold">
+                      ✨ No ticker needed — AI recognizes the chart automatically
+                    </span>
                   </div>
                 )}
 
@@ -466,12 +438,12 @@ const AIChartReader: React.FC = () => {
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin text-slate-950" />
-                {activeMode === '5day' ? 'Analyzing 5-Day Chart & Projecting...' : 'Reading Pattern via AI...'}
+                {activeMode === '5day' ? 'Analyzing 5-Day Chart & Projecting Next Day...' : 'Reading Pattern via AI...'}
               </>
             ) : (
               <>
                 <Sparkles size={16} />
-                {activeMode === '5day' ? 'Analyze Last 5 Days & Next-Day Value' : 'Generate Plain-Language Read'}
+                {activeMode === '5day' ? 'Check 5-Day & Next-Day Analysis' : 'Generate Plain-Language Read'}
               </>
             )}
           </button>
@@ -490,7 +462,7 @@ const AIChartReader: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     <h2 className="text-lg font-extrabold text-white">
-                      {result.ticker ? `${result.ticker} Analysis Readout` : 'Analyst Pattern Readout'}
+                      {result.detected_ticker || result.ticker ? `${result.detected_ticker || result.ticker} Analysis Readout` : 'Analyst Pattern Readout'}
                     </h2>
                   </div>
                   <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
@@ -509,19 +481,42 @@ const AIChartReader: React.FC = () => {
 
               <div className="p-6 space-y-5">
 
-                {/* Tentative Next Day Value (Prominently Highlighted) */}
+                {/* 1. Quick Last 5 Days Chart Analysis (First) */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                      <LineChart size={15} className="text-blue-400" />
+                      Quick Last 5 Days Chart Analysis
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {result.five_day_return_pct !== undefined && (
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${result.five_day_return_pct >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+                          5-Day Net: {result.five_day_return_pct >= 0 ? '+' : ''}{result.five_day_return_pct}%
+                        </span>
+                      )}
+                      {result.latest_close && (
+                        <span className="text-xs text-slate-400">
+                          Latest Close: <strong className="text-white font-mono">₹{result.latest_close.toLocaleString('en-IN')}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-100 leading-relaxed font-medium bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                    "{result.quick_5day_analysis || result.plain_language_explanation}"
+                  </p>
+                </div>
+
+                {/* 2. Next-Day Analysis & Tentative Value (Second) */}
                 {result.tentative_next_day_value !== undefined && (
                   <div className="bg-gradient-to-br from-indigo-950/70 via-slate-950 to-emerald-950/30 rounded-xl p-4 sm:p-5 border border-indigo-500/30 shadow-md space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs font-bold text-indigo-300 uppercase tracking-wider">
                         <Target size={16} className="text-emerald-400" />
-                        <span>Tentative Next Day Value</span>
+                        <span>Next-Day Analysis & Tentative Value</span>
                       </div>
-                      {result.five_day_return_pct !== undefined && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${result.five_day_return_pct >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
-                          5-Day Net: {result.five_day_return_pct >= 0 ? '+' : ''}{result.five_day_return_pct}%
-                        </span>
-                      )}
+                      <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold uppercase tracking-wider">
+                        Next Session Forecast
+                      </span>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 border-b border-slate-800/80 pb-3">
@@ -550,24 +545,6 @@ const AIChartReader: React.FC = () => {
                     )}
                   </div>
                 )}
-
-                {/* Quick Last 5 Days Chart Analysis (Prominently Highlighted with explicit heading) */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                      <LineChart size={15} className="text-blue-400" />
-                      Quick Last 5 Days Chart Analysis
-                    </span>
-                    {result.latest_close && (
-                      <span className="text-xs text-slate-400">
-                        Latest Close: <strong className="text-white font-mono">₹{result.latest_close.toLocaleString('en-IN')}</strong>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-100 leading-relaxed font-medium bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                    "{result.quick_5day_analysis || result.plain_language_explanation}"
-                  </p>
-                </div>
 
                 {/* 5-Day Session Candlestick OHLCV Data Table */}
                 {result.five_day_candles && result.five_day_candles.length > 0 && (
@@ -660,11 +637,11 @@ const AIChartReader: React.FC = () => {
                 {activeMode === '5day' ? <Target size={28} /> : <Bot size={28} />}
               </div>
               <h3 className="font-bold text-white text-base">
-                {activeMode === '5day' ? 'Awaiting 5-Day Analysis Request' : 'Awaiting Chart Upload'}
+                {activeMode === '5day' ? 'Ready for 5-Day & Next-Day Analysis' : 'Awaiting Chart Upload'}
               </h3>
               <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
                 {activeMode === '5day'
-                  ? 'Type an NSE stock ticker above and submit your request to generate the quick last 5 days chart analysis and tentative next-day value.'
+                  ? 'Search and select an NSE stock on the left, then click "Check 5-Day & Next-Day Analysis" to review the 5-day chart dynamics and see the next-day forecast.'
                   : 'Upload a chart screenshot and select a stock ticker to produce an AI-grounded, plain-spoken pattern readout.'
                 }
               </p>

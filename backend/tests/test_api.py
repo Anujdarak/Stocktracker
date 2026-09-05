@@ -10,11 +10,11 @@ def test_health():
     assert res.status_code == 200
     assert "MarketPulse" in res.json().get("message", "")
 
-def test_search_zomato_and_titan():
-    res = client.get("/api/search/?q=zomato")
+def test_search_tcs_and_titan():
+    res = client.get("/api/search/?q=tcs")
     assert res.status_code == 200
     results = res.json().get("results", [])
-    assert any(r["symbol"] == "ZOMATO" for r in results)
+    assert any(r["symbol"] == "TCS" for r in results)
 
     res2 = client.get("/api/search/?q=titan")
     assert res2.status_code == 200
@@ -61,8 +61,8 @@ def test_peers():
 
 def test_analyze_results():
     res = client.post("/api/llm/analyze-results", json={
-        "ticker": "ZOMATO",
-        "results_details": "Revenue surged 68% YoY to Rs 4,799 Cr. Net profit rose 389% YoY."
+        "ticker": "RELIANCE",
+        "results_details": "Revenue surged 68% YoY to Rs 243,632 Cr. Net profit rose 12% YoY."
     })
     assert res.status_code == 200
     data = res.json().get("data", {})
@@ -93,7 +93,7 @@ def test_valuation_dcf():
 def test_portfolio_simulate():
     res = client.post("/api/market/portfolio-simulate", json={
         "holdings": [
-            {"ticker": "ZOMATO", "quantity": 100},
+            {"ticker": "TCS", "quantity": 100},
             {"ticker": "INFY", "quantity": 10}
         ]
     })
@@ -197,7 +197,7 @@ def test_analyze_5day_chart():
 if __name__ == "__main__":
     tests = [
         test_health,
-        test_search_zomato_and_titan,
+        test_search_tcs_and_titan,
         test_search_20microns,
         test_indices,
         test_quote_reliance,

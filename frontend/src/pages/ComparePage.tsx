@@ -11,7 +11,7 @@ const PRESET_BATTLES = [
   { name: 'IT Tech Giants', tickers: ['TCS', 'INFY', 'WIPRO'] },
   { name: 'Private Banking Titans', tickers: ['HDFCBANK', 'ICICIBANK', 'KOTAKBANK'] },
   { name: 'Defense Heavyweights', tickers: ['HAL', 'BEL'] },
-  { name: 'Consumer Internet & Quick Commerce', tickers: ['ZOMATO', 'PAYTM'] }
+  { name: 'Retail & Consumer Giants', tickers: ['TITAN', 'TRENT'] }
 ];
 
 export const ComparePage: React.FC = () => {

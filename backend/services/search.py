@@ -34,7 +34,7 @@ class SearchService:
 
         # Supplemental popular/recent NSE listings that might not be in older EQUITY_L exports
         supplemental = [
-            {"symbol": "ZOMATO", "name": "Zomato Limited"},
+            {"symbol": "ETERNAL", "name": "Eternal Limited"},
             {"symbol": "JIOFIN", "name": "Jio Financial Services Limited"},
             {"symbol": "PAYTM", "name": "One97 Communications Limited (Paytm)"},
             {"symbol": "NYKAA", "name": "FSN E-Commerce Ventures Limited (Nykaa)"},

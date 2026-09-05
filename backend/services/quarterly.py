@@ -5,7 +5,7 @@ import yfinance as yf
 
 # Curated fallback/consensus quarterly figures for companies where yfinance has gaps or for forward estimates
 CURATED_QUARTERLY_DB: Dict[str, List[Dict[str, Any]]] = {
-    "ZOMATO": [
+    "ETERNAL": [
         {"quarter": "Q1", "year": "2025", "date": "2024-06-30", "simple_label": "Q1 2025", "revenue_cr": 4206.0, "net_profit_cr": 253.0, "operating_income_cr": 244.0, "ebitda_cr": 299.0, "operating_margin_pct": 5.8, "is_projection": False},
         {"quarter": "Q2", "year": "2025", "date": "2024-09-30", "simple_label": "Q2 2025", "revenue_cr": 4799.0, "net_profit_cr": 176.0, "operating_income_cr": 196.0, "ebitda_cr": 250.0, "operating_margin_pct": 4.1, "is_projection": False},
         {"quarter": "Q3", "year": "2025", "date": "2024-12-31", "simple_label": "Q3 2025", "revenue_cr": 5410.0, "net_profit_cr": 220.0, "operating_income_cr": 249.0, "ebitda_cr": 310.0, "operating_margin_pct": 4.6, "is_projection": False},

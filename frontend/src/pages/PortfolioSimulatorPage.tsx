@@ -14,7 +14,7 @@ import {
 export const PortfolioSimulatorPage: React.FC = () => {
   const [samples, setSamples] = useState<Record<string, any>>({});
   const [holdings, setHoldings] = useState<Array<{ ticker: string; quantity: number }>>([
-    { ticker: 'ZOMATO', quantity: 500 },
+    { ticker: 'ITC', quantity: 500 },
     { ticker: 'INFY', quantity: 50 },
     { ticker: 'TCS', quantity: 25 },
     { ticker: 'PAYTM', quantity: 100 }
