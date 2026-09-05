@@ -133,34 +133,10 @@ async def analyze_results_impact(payload: ResultsImpactRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM results analysis failed: {str(e)}")
 
-class ValuationVerdictRequest(BaseModel):
-    ticker: str
-    dcf_inputs: Dict[str, Any]
-    dcf_output: Dict[str, Any]
-    provider: Optional[str] = "deepseek"
-    api_key: Optional[str] = None
-
 class PortfolioDiagnosticRequest(BaseModel):
     portfolio_data: Dict[str, Any]
     provider: Optional[str] = "deepseek"
     api_key: Optional[str] = None
-
-@router.post("/valuation-verdict")
-async def analyze_valuation_verdict(payload: ValuationVerdictRequest):
-    """
-    Translates DCF valuation model outputs into plain-language market expectations.
-    """
-    try:
-        result = llm_service.analyze_valuation_verdict(
-            ticker=payload.ticker,
-            dcf_inputs=payload.dcf_inputs,
-            dcf_output=payload.dcf_output,
-            provider=payload.provider or "deepseek",
-            api_key=payload.api_key
-        )
-        return {"status": "success", "data": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Valuation verdict generation failed: {str(e)}")
 
 @router.post("/portfolio-diagnostic")
 async def analyze_portfolio_diagnostic(payload: PortfolioDiagnosticRequest):

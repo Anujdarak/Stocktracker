@@ -295,12 +295,6 @@ export const ComparePage: React.FC = () => {
                           >
                             Technical View →
                           </Link>
-                          <Link
-                            to={`/valuation/${sym}`}
-                            className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold block"
-                          >
-                            DCF Modeler →
-                          </Link>
                         </td>
                       );
                     })}

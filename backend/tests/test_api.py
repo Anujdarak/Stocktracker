@@ -81,15 +81,6 @@ def test_quarterly_comparison_query():
     assert len(data["exact_table"]) >= 4
     assert "plain_language_verdict" in data
 
-def test_valuation_dcf():
-    res = client.get("/api/market/valuation/RELIANCE")
-    assert res.status_code == 200
-    scenarios = res.json().get("data", {}).get("scenarios", {})
-    assert "base" in scenarios
-    assert "bull" in scenarios
-    assert "bear" in scenarios
-    assert scenarios["base"].get("fair_value") is not None
-
 def test_portfolio_simulate():
     res = client.post("/api/market/portfolio-simulate", json={
         "holdings": [
@@ -113,17 +104,6 @@ def test_screener():
     assert res.status_code == 200
     data = res.json().get("data", [])
     assert len(data) > 0
-
-def test_valuation_verdict_llm():
-    res = client.post("/api/llm/valuation-verdict", json={
-        "ticker": "RELIANCE",
-        "dcf_inputs": {"growth_rate": 12.0, "discount_rate": 12.5, "terminal_growth": 4.5},
-        "dcf_output": {"current_price": 2850.0, "fair_value": 3100.0, "discount_percentage": 8.8, "valuation_verdict": "Fairly Valued"},
-        "provider": "gemini"
-    })
-    assert res.status_code == 200
-    data = res.json().get("data", {})
-    assert "plain_language_verdict" in data
 
 def test_portfolio_diagnostic_llm():
     res = client.post("/api/llm/portfolio-diagnostic", json={
@@ -205,11 +185,9 @@ if __name__ == "__main__":
         test_sectors,
         test_peers,
         test_analyze_results,
-        test_valuation_dcf,
         test_portfolio_simulate,
         test_compare_stocks,
         test_screener,
-        test_valuation_verdict_llm,
         test_portfolio_diagnostic_llm,
         test_vix_volatility_outlook,
         test_corporate_actions_stock,

@@ -14,7 +14,6 @@ import {
   Users,
   AlertCircle,
   BarChart2,
-  Calculator,
   GitCompare
 } from 'lucide-react';
 
@@ -239,15 +238,6 @@ const StockPage: React.FC = () => {
                 </>
               )}
             </button>
-
-            <Link
-              to={`/valuation/${ticker}`}
-              className="px-3 py-2.5 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 rounded-xl border border-emerald-500/30 transition-colors flex items-center gap-1.5 text-xs font-semibold shadow-xs"
-              title="Interactive DCF Fair Value Modeler"
-            >
-              <Calculator size={15} />
-              <span>DCF Model</span>
-            </Link>
 
             <Link
               to={`/compare`}

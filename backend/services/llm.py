@@ -590,44 +590,6 @@ Return a JSON object with exactly these fields:
 
         return self._cascade_llm_call(prompt, system_instruction, preferred_provider="deepseek", fallback_factory=_free_results_fallback)
 
-    def analyze_valuation_verdict(self, ticker: str, dcf_inputs: dict, dcf_output: dict, provider: str = "deepseek", api_key: str = None) -> dict:
-        """
-        Translates a DCF valuation model into a plain-language financial explanation.
-        """
-        system_instruction = (
-            "You are a financial analyst explaining a stock's valuation to everyday Indian retail investors. "
-            "Explain in 2-3 clear, simple sentences what market expectations are baked into the current price. "
-            "Never tell the user to buy or sell. Use strictly educational and objective language. "
-            "Output MUST be strict JSON."
-        )
-
-        prompt = f"""
-Analyze this Discounted Cash Flow (DCF) model for: {ticker}
-
-DCF Assumptions:
-- Current Stock Price: ₹{dcf_output.get('current_price')}
-- Estimated Fair Value: ₹{dcf_output.get('fair_value')}
-- Implied Discount/Premium: {dcf_output.get('discount_percentage')}% ({dcf_output.get('valuation_verdict')})
-- Expected 5-Year Annual Growth Rate: {dcf_inputs.get('growth_rate')}%
-- Discount Rate (WACC): {dcf_inputs.get('discount_rate')}%
-- Terminal Growth Rate: {dcf_inputs.get('terminal_growth', 4.5)}%
-
-Return JSON:
-{{
-    "plain_language_verdict": "2-3 short, clear sentences explaining what this valuation implies in everyday language.",
-    "market_expectations": "What level of future company performance the current market price assumes.",
-    "key_risk_factor": "One main factor that could disrupt this valuation assumption."
-}}
-"""
-        def _free_valuation_fallback():
-            return {
-                "plain_language_verdict": f"Based on a {dcf_inputs.get('growth_rate')}% projected growth rate, the estimated fair value is ₹{dcf_output.get('fair_value')}, indicating the stock is currently {dcf_output.get('valuation_verdict', 'Fairly Valued').lower()}.",
-                "market_expectations": "The market is pricing in steady long-term compounding.",
-                "key_risk_factor": "Changes in industry growth rates or macroeconomic interest rates."
-            }
-
-        return self._cascade_llm_call(prompt, system_instruction, preferred_provider=provider, api_key=api_key, fallback_factory=_free_valuation_fallback)
-
     def analyze_portfolio_health(self, portfolio_data: dict, provider: str = "deepseek", api_key: str = None) -> dict:
         """
         Generates an educational risk and diversification diagnostic for a user's portfolio.

@@ -162,12 +162,6 @@ export const ScreenerPage: React.FC = () => {
                           >
                             Chart →
                           </Link>
-                          <Link
-                            to={`/valuation/${sym}`}
-                            className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-md transition-colors"
-                          >
-                            DCF →
-                          </Link>
                         </div>
                       </td>
                     </tr>

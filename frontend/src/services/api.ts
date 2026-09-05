@@ -178,22 +178,6 @@ export const llmService = {
     }
   },
 
-  getValuationVerdict: async (ticker: string, dcfInputs: any, dcfOutput: any, provider = "deepseek", apiKey?: string) => {
-    try {
-      const { data } = await api.post('/llm/valuation-verdict', {
-        ticker,
-        dcf_inputs: dcfInputs,
-        dcf_output: dcfOutput,
-        provider,
-        api_key: apiKey
-      });
-      return data.data || data;
-    } catch (error) {
-      console.error("Valuation verdict error", error);
-      throw error;
-    }
-  },
-
   getPortfolioDiagnostic: async (portfolioData: any, provider = "deepseek", apiKey?: string) => {
     try {
       const { data } = await api.post('/llm/portfolio-diagnostic', {
@@ -204,35 +188,6 @@ export const llmService = {
       return data.data || data;
     } catch (error) {
       console.error("Portfolio diagnostic error", error);
-      throw error;
-    }
-  }
-};
-
-export const valuationService = {
-  getValuation: async (ticker: string) => {
-    try {
-      const { data } = await api.get(`/market/valuation/${ticker}`);
-      return data.data;
-    } catch (error) {
-      console.error(`Valuation fetch error for ${ticker}`, error);
-      throw error;
-    }
-  },
-
-  calculateCustomDcf: async (payload: {
-    current_price: number;
-    base_eps: number;
-    growth_rate: number;
-    discount_rate: number;
-    terminal_growth?: number;
-    years?: number;
-  }) => {
-    try {
-      const { data } = await api.post('/market/valuation/calculate', payload);
-      return data.data;
-    } catch (error) {
-      console.error("Custom DCF calculate error", error);
       throw error;
     }
   }

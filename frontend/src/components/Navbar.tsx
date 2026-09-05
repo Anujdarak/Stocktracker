@@ -4,7 +4,6 @@ import {
   Eye,
   Menu,
   FileText,
-  Calculator,
   Activity,
   GitCompare,
   SlidersHorizontal,
@@ -33,10 +32,6 @@ const Navbar = () => {
           <nav className="hidden lg:flex items-center gap-2 text-xs font-semibold">
             <NavLink to="/" className={({isActive}) => `px-2.5 py-1.5 rounded-lg transition-all ${isActive ? 'bg-slate-900 text-emerald-400 border border-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}`}>Markets</NavLink>
             <NavLink to="/sectors" className={({isActive}) => `px-2.5 py-1.5 rounded-lg transition-all ${isActive ? 'bg-slate-900 text-emerald-400 border border-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}`}>Sectors</NavLink>
-            <NavLink to="/valuation" className={({isActive}) => `px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${isActive ? 'bg-slate-900 text-emerald-400 border border-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}`}>
-              <Calculator size={14} className="text-emerald-400" />
-              DCF
-            </NavLink>
             <NavLink to="/portfolio-health" className={({isActive}) => `px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${isActive ? 'bg-slate-900 text-blue-400 border border-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'}`}>
               <Activity size={14} className="text-blue-400" />
               Risk

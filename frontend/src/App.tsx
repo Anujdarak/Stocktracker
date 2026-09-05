@@ -7,7 +7,6 @@ import SectorExplorer from './pages/SectorExplorer';
 import AIChartReader from './pages/AIChartReader';
 import WatchlistPage from './pages/WatchlistPage';
 import NewsResultsPage from './pages/NewsResultsPage';
-import { ValuationPage } from './pages/ValuationPage';
 import { PortfolioSimulatorPage } from './pages/PortfolioSimulatorPage';
 import { ComparePage } from './pages/ComparePage';
 import { ScreenerPage } from './pages/ScreenerPage';
@@ -26,8 +25,6 @@ function App() {
           <Route path="/ai-chart-reader" element={<AIChartReader />} />
           <Route path="/news-results" element={<NewsResultsPage />} />
           <Route path="/corporate-actions" element={<CorporateActionsPage />} />
-          <Route path="/valuation" element={<ValuationPage />} />
-          <Route path="/valuation/:ticker" element={<ValuationPage />} />
           <Route path="/portfolio-health" element={<PortfolioSimulatorPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/screener" element={<ScreenerPage />} />

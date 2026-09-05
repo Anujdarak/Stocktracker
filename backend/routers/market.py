@@ -5,20 +5,10 @@ import math
 
 try:
     from backend.services.market_data import market_data_service
-    from backend.services.valuation import valuation_service
     from backend.services.portfolio import portfolio_service
 except ImportError:
     from services.market_data import market_data_service
-    from services.valuation import valuation_service
     from services.portfolio import portfolio_service
-
-class DcfCalculateRequest(BaseModel):
-    current_price: float
-    base_eps: float
-    growth_rate: float
-    discount_rate: float
-    terminal_growth: float = 4.5
-    years: int = 5
 
 class PortfolioSimulateRequest(BaseModel):
     holdings: List[Dict[str, Any]]
@@ -146,75 +136,6 @@ async def get_history(
         return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
-
-@router.get("/valuation/{ticker}")
-async def get_valuation(ticker: str):
-    """
-    Get DCF inputs and pre-calculated Base, Bull, Bear scenarios.
-    """
-    try:
-        inputs = valuation_service.get_valuation_inputs(ticker)
-        current_price = inputs.get("current_price") or 0.0
-        base_eps = inputs.get("trailing_eps") or 10.0
-        defaults = inputs.get("defaults", {})
-
-        # Compute pre-calculated scenarios
-        base_dcf = valuation_service.calculate_dcf(
-            current_price=current_price,
-            base_eps=base_eps,
-            growth_rate=defaults.get("base_growth_rate", 12.0),
-            discount_rate=defaults.get("discount_rate", 12.5),
-            terminal_growth=defaults.get("terminal_growth_rate", 4.5),
-            years=defaults.get("projection_years", 5)
-        )
-        bull_dcf = valuation_service.calculate_dcf(
-            current_price=current_price,
-            base_eps=base_eps,
-            growth_rate=defaults.get("bull_growth_rate", 16.0),
-            discount_rate=defaults.get("discount_rate", 12.5),
-            terminal_growth=defaults.get("terminal_growth_rate", 4.5),
-            years=defaults.get("projection_years", 5)
-        )
-        bear_dcf = valuation_service.calculate_dcf(
-            current_price=current_price,
-            base_eps=base_eps,
-            growth_rate=defaults.get("bear_growth_rate", 8.0),
-            discount_rate=defaults.get("discount_rate", 12.5),
-            terminal_growth=defaults.get("terminal_growth_rate", 4.5),
-            years=defaults.get("projection_years", 5)
-        )
-
-        return {
-            "status": "success",
-            "data": {
-                "inputs": inputs,
-                "scenarios": {
-                    "base": base_dcf,
-                    "bull": bull_dcf,
-                    "bear": bear_dcf
-                }
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Valuation calculation failed: {str(e)}")
-
-@router.post("/valuation/calculate")
-async def calculate_custom_dcf(payload: DcfCalculateRequest):
-    """
-    Execute customized DCF calculation based on user slider adjustments.
-    """
-    try:
-        result = valuation_service.calculate_dcf(
-            current_price=payload.current_price,
-            base_eps=payload.base_eps,
-            growth_rate=payload.growth_rate,
-            discount_rate=payload.discount_rate,
-            terminal_growth=payload.terminal_growth,
-            years=payload.years
-        )
-        return {"status": "success", "data": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Custom DCF failed: {str(e)}")
 
 @router.get("/portfolio/samples")
 async def get_portfolio_samples():
