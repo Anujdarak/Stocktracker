@@ -155,6 +155,51 @@ class LLMService:
             return res.text
         except Exception as e:
             return f"Chart visual feature extraction: {str(e)}"
+    def _resolve_symbol(self, candidate: Optional[str]) -> Optional[str]:
+        """Robustly resolve ticker symbols and company names to standard .NS symbols."""
+        if not candidate:
+            return None
+        upper = str(candidate).upper().strip()
+        if not upper or upper in ["CHART PATTERN", "CHART ANALYSIS", "UNKNOWN", "NONE"]:
+            return None
+
+        # Check index aliases
+        if any(k in upper for k in ["NIFTY 50", "NIFTY50", "^NSEI"]):
+            return "^NSEI"
+        if any(k in upper for k in ["BANK NIFTY", "BANKNIFTY", "^NSEBANK"]):
+            return "^NSEBANK"
+        if any(k in upper for k in ["SENSEX", "^BSESN"]):
+            return "^BSESN"
+
+        if upper in market_data_service.TICKER_ALIASES:
+            return market_data_service.TICKER_ALIASES[upper]
+
+        # Clean noise words
+        clean_text = re.sub(r'\b(NSE|BSE|EQ|LTD|LIMITED|CORP|CO|INC|HOLDINGS|CHART|STOCK|SHARE|PATTERNS|PATTERN|ANALYSIS|CANDLESTICK)\b', ' ', upper, flags=re.IGNORECASE)
+        tokens = [t for t in re.findall(r'[A-Za-z0-9&]+', clean_text) if not t.isdigit() and len(t) >= 2]
+
+        equities = search_service.equities
+        sym_map = {eq["symbol"].upper(): eq["symbol"] for eq in equities}
+
+        # 1. Exact ticker symbol match
+        for t in tokens:
+            if t in sym_map:
+                return f"{sym_map[t]}.NS"
+            if t in market_data_service.TICKER_ALIASES:
+                return market_data_service.TICKER_ALIASES[t]
+
+        # 2. Company name match via search_service
+        for t in tokens:
+            if len(t) >= 3:
+                s_res = search_service.search(t, limit=1)
+                if s_res:
+                    return f"{s_res[0]['symbol']}.NS"
+
+        # 3. Fallback to clean candidate
+        if tokens:
+            clean_first = tokens[0].replace(".NS", "")
+            return f"{clean_first}.NS"
+        return None
 
     def _post_process_chart_result(
         self,
@@ -166,7 +211,7 @@ class LLMService:
         """
         Enrich and ground the chart screenshot analysis with real NSE market data,
         ensuring Base Support, Base Resistance, and High Resistance are always calculated,
-        accurate, and explicitly provided.
+        accurate, and explicitly scaled to each specific stock (e.g. ₹14.50 vs ₹2,500.00).
         """
         # 1. Discover or normalize ticker
         candidate_ticker = explicit_ticker
@@ -177,68 +222,40 @@ class LLMService:
 
         if not candidate_ticker and image_path:
             fname = os.path.basename(image_path).upper()
-            for eq in search_service.equities[:200]:
-                if eq["symbol"] in fname:
-                    candidate_ticker = eq["symbol"]
-                    break
+            candidate_ticker = self._resolve_symbol(fname)
 
         if not candidate_ticker and context_text:
-            words = re.findall(r'[A-Za-z0-9&]+', context_text.upper())
-            for w in words:
-                matches = [eq for eq in search_service.equities[:300] if eq["symbol"] == w]
-                if matches:
-                    candidate_ticker = matches[0]["symbol"]
-                    break
+            candidate_ticker = self._resolve_symbol(context_text)
 
-        resolved_sym = None
+        resolved_sym = self._resolve_symbol(candidate_ticker) if candidate_ticker else None
         market_quote = None
         market_hist = None
 
-        if candidate_ticker:
-            norm = candidate_ticker.upper().replace(".NS", "").replace("^", "").strip()
-            if norm in ["NIFTY", "NIFTY 50", "NIFTY50", "NSEI"]:
-                resolved_sym = "^NSEI"
-            elif norm in ["BANKNIFTY", "BANK NIFTY"]:
-                resolved_sym = "^NSEBANK"
-            elif norm in ["SENSEX", "BSESN"]:
-                resolved_sym = "^BSESN"
-            else:
-                matches = [eq for eq in search_service.equities if eq["symbol"].upper() == norm]
-                if matches:
-                    resolved_sym = f"{matches[0]['symbol']}.NS"
-                else:
-                    search_res = search_service.search(norm, limit=1)
-                    if search_res:
-                        resolved_sym = f"{search_res[0]['symbol']}.NS"
-                    else:
-                        resolved_sym = f"{norm}.NS"
+        if resolved_sym:
+            try:
+                market_quote = market_data_service.get_quote(resolved_sym)
+                market_hist = market_data_service.get_historical_data(resolved_sym, interval="1d", period="3mo")
+                result["detected_ticker"] = resolved_sym.replace(".NS", "").replace("^", "")
+            except Exception as e:
+                print(f"Market data grounding lookup for {resolved_sym}: {e}")
 
-            if resolved_sym:
-                try:
-                    market_quote = market_data_service.get_quote(resolved_sym)
-                    market_hist = market_data_service.get_historical_data(resolved_sym, interval="1d", period="3mo")
-                    result["detected_ticker"] = resolved_sym.replace(".NS", "").replace("^", "")
-                except Exception as e:
-                    print(f"Market data grounding lookup for {resolved_sym}: {e}")
-
-        # 2. Extract or compute technical levels
+        # 2. Extract grounded technical levels from market data
         curr_price_val = None
         base_supp_val = None
         base_res_val = None
         high_res_val = None
 
-        if market_hist and len(market_hist) > 0:
-            last_close = market_hist[-1]["close"]
-            if market_quote and market_quote.get("currentPrice"):
-                curr_price_val = float(market_quote["currentPrice"])
-            else:
-                curr_price_val = float(last_close)
+        if market_quote and market_quote.get("current_price"):
+            curr_price_val = float(market_quote["current_price"])
+        elif market_hist and len(market_hist) > 0:
+            curr_price_val = float(market_hist[-1]["close"])
 
+        if market_hist and len(market_hist) > 0 and curr_price_val:
             high_3m = max(h["high"] for h in market_hist)
             low_3m = min(h["low"] for h in market_hist)
             high_20d = max(h["high"] for h in market_hist[-20:]) if len(market_hist) >= 20 else high_3m
             low_20d = min(h["low"] for h in market_hist[-20:]) if len(market_hist) >= 20 else low_3m
-            high_52w = float(market_quote.get("fiftyTwoWeekHigh", high_3m)) if market_quote else high_3m
+            high_52w = float(market_quote.get("52_week_high", high_3m)) if market_quote and market_quote.get("52_week_high") else high_3m
 
             base_supp_val = low_20d if curr_price_val > low_20d else round(curr_price_val * 0.96, 2)
             base_res_val = high_20d if high_20d > curr_price_val else round(curr_price_val * 1.035, 2)
@@ -250,7 +267,9 @@ class LLMService:
             nums = re.findall(r"[\d,]+(?:\.\d+)?", str(s).replace(",", ""))
             if nums:
                 try:
-                    return float(nums[0])
+                    v = float(nums[0])
+                    if v > 0:
+                        return v
                 except ValueError:
                     return None
             return None
@@ -260,13 +279,14 @@ class LLMService:
         ai_base_res = _parse_price_num(result.get("base_resistance") or (result.get("trader_jargon") or {}).get("base_resistance") or (result.get("trader_jargon") or {}).get("resistance_level"))
         ai_high_res = _parse_price_num(result.get("high_resistance") or (result.get("trader_jargon") or {}).get("high_resistance"))
 
-        final_curr = ai_curr or curr_price_val or 2500.0
+        # Determine final current price: AI vision detection first, then live quote, then reasonable default
+        final_curr = ai_curr or curr_price_val or 100.0
         final_supp = ai_supp or base_supp_val or round(final_curr * 0.95, 2)
-        final_base_res = ai_base_res or base_res_val or round(final_curr * 1.035, 2)
+        final_base_res = ai_base_res or base_res_val or round(final_curr * 1.045, 2)
         final_high_res = ai_high_res or high_res_val or round(final_base_res * 1.06, 2)
 
         if final_base_res <= final_supp:
-            final_base_res = round(final_supp * 1.05, 2)
+            final_base_res = round(final_supp * 1.04, 2)
         if final_high_res <= final_base_res:
             final_high_res = round(final_base_res * 1.05, 2)
 
@@ -292,7 +312,7 @@ class LLMService:
         result["trader_jargon"] = tj
 
         result["key_levels"] = [
-            f"Base Support: {base_supp_str} — Foundational buyer demand floor where price bounced.",
+            f"Base Support: {base_supp_str} — Primary demand floor where buyers enter and defend.",
             f"Base Resistance: {base_res_str} — Immediate price ceiling where initial selling pressure emerges.",
             f"High Resistance: {high_res_str} — Major upper breakout barrier and swing peak resistance."
         ]
@@ -308,7 +328,7 @@ class LLMService:
         image_path: str,
         context_text: str = "",
         ticker: Optional[str] = None,
-        provider: str = "deepseek",
+        provider: str = "gemini",
         api_key: Optional[str] = None
     ) -> dict:
         """
@@ -336,10 +356,12 @@ class LLMService:
                 grounded_data_summary = f"(Historical data lookup: {str(e)})"
 
         system_instruction = (
-            "You are an expert technical financial analyst. "
+            "You are an expert technical financial analyst for stock charts. "
             "Examine the stock chart image to identify: "
-            "1. Any stock symbol or company name visible in headers/titles. "
-            "2. Critical horizontal price levels from the vertical scale: Current Price, Base Support, Base Resistance, and High Resistance. "
+            "1. The exact stock ticker symbol or company name visible in headers/titles. "
+            "2. The exact price numbers from the vertical right/left scale: Current Price, Base Support, Base Resistance, and High Resistance. "
+            "Different stocks trade at different price tiers (e.g. ₹14.50 vs ₹150.00 vs ₹2,500.00). "
+            "You must read and output the exact prices shown on this chart image. "
             "3. Plain language explanation explaining how price behaves between base support and base resistance. "
             "Return valid JSON matching the specified schema."
         )
@@ -348,14 +370,18 @@ class LLMService:
 Analyze this stock chart image with technical precision.
 
 1. DETECT TICKER / ASSET NAME:
-Look closely at the chart's top-left corner, header, watermark, or title for the stock ticker symbol or company name (e.g. RELIANCE, TCS, INFY, HDFCBANK, NIFTY 50, TATAMOTORS, etc.). Put this in 'detected_ticker'.
+Look closely at the chart's top-left corner, header, watermark, or title for the stock ticker symbol or company name (e.g. RELIANCE, TCS, INFY, IDEA, SUZLON, TATAMOTORS, NIFTY 50, etc.). Put this in 'detected_ticker'.
 
 2. KEY TECHNICAL PRICE LEVELS:
-Carefully read the price values on the vertical right/left scale:
-- 'current_price': Current or latest traded price (e.g. ₹2850.00).
-- 'base_support': Primary demand floor where candles bounce / find support (e.g. ₹2750.00).
-- 'base_resistance': The immediate / primary resistance ceiling where price faces selling (e.g. ₹2920.00).
-- 'high_resistance': The major upper swing high or breakout resistance barrier (e.g. ₹3050.00).
+CRITICAL FOR DIFFERENT PRICED STOCKS:
+Carefully read the exact price numbers and decimal values from the vertical right/left price scale in THIS SPECIFIC CHART SCREENSHOT.
+Different stocks trade at completely different price tiers (e.g., a stock at ₹14.50 has base resistance around ₹15.00-15.50; a stock at ₹150 has resistance at ₹160; a stock at ₹2850 has resistance at ₹2950).
+Do NOT guess large numbers like 2000 or 3000 unless those exact numbers are visible on this chart's axis!
+
+- 'current_price': Current or latest traded price number visible on this chart (format: "₹...").
+- 'base_support': Primary demand floor where candles bounce / find support (format: "₹...").
+- 'base_resistance': The immediate / primary resistance ceiling where price faces selling (format: "₹...").
+- 'high_resistance': The major upper swing high or breakout resistance barrier (format: "₹...").
 
 {grounded_data_summary}
 
@@ -364,7 +390,7 @@ Additional User Context:
 
 Return JSON with exactly these fields:
 {{
-    "detected_ticker": "Symbol or Name (e.g. RELIANCE, TCS, NIFTY) or 'Chart Pattern'",
+    "detected_ticker": "Symbol or Name observed on the chart",
     "current_price": "₹...",
     "base_support": "₹...",
     "base_resistance": "₹...",
@@ -392,8 +418,17 @@ Return JSON with exactly these fields:
 """
 
         # Round-robin cascade:
-        preferred = (provider or "deepseek").lower()
-        provider_order = ["deepseek", "gemini"] if preferred == "deepseek" else ["gemini", "deepseek"]
+        has_deepseek = bool(api_key or self.deepseek_default_key)
+        has_gemini = bool(os.getenv("GEMINI_API_KEY"))
+
+        if (provider or "").lower() == "deepseek" and has_deepseek:
+            provider_order = ["deepseek", "gemini"]
+        elif (provider or "").lower() == "gemini" and has_gemini:
+            provider_order = ["gemini", "deepseek"]
+        elif has_gemini:
+            provider_order = ["gemini", "deepseek"]
+        else:
+            provider_order = ["deepseek", "gemini"]
 
         for prov in provider_order:
             if prov == "deepseek":

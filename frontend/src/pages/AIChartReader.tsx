@@ -82,7 +82,7 @@ const AIChartReader: React.FC = () => {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   // Engine selection: 'deepseek' or 'gemini'
-  const [provider, setProvider] = useState<'deepseek' | 'gemini'>('deepseek');
+  const [provider, setProvider] = useState<'deepseek' | 'gemini'>('gemini');
   const [customApiKey, setCustomApiKey] = useState('');
   const [showKeyInput, setShowKeyInput] = useState(false);
 
