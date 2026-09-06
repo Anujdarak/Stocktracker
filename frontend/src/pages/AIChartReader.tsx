@@ -18,7 +18,8 @@ import {
   Key,
   Calendar,
   Target,
-  LineChart
+  LineChart,
+  Shield
 } from 'lucide-react';
 
 interface AnalysisResult {
@@ -28,10 +29,18 @@ interface AnalysisResult {
   key_levels: string[];
   model_used?: string;
   detected_ticker?: string;
+  base_support?: string;
+  base_resistance?: string;
+  high_resistance?: string;
+  current_price?: string;
   trader_jargon?: {
     trend_bias?: string;
     support_level?: string;
     resistance_level?: string;
+    base_support?: string;
+    base_resistance?: string;
+    high_resistance?: string;
+    current_price?: string;
     technical_pattern?: string;
     pivot_level?: string;
   };
@@ -146,6 +155,10 @@ const AIChartReader: React.FC = () => {
           confidence: response.confidence || 'Medium',
           key_levels: Array.isArray(response.key_levels) ? response.key_levels : [response.key_levels].filter(Boolean),
           model_used: response.model_used || (provider === 'deepseek' ? 'DeepSeek (V3/R1 Real-time Analysis)' : 'Google Gemini 2.5 Flash'),
+          base_support: response.base_support || response.trader_jargon?.base_support || response.trader_jargon?.support_level,
+          base_resistance: response.base_resistance || response.trader_jargon?.base_resistance || response.trader_jargon?.resistance_level,
+          high_resistance: response.high_resistance || response.trader_jargon?.high_resistance,
+          current_price: response.current_price || (response.latest_close ? `₹${response.latest_close.toLocaleString('en-IN')}` : undefined),
           trader_jargon: response.trader_jargon || {},
           quick_5day_analysis: response.quick_5day_analysis,
           tentative_next_day_value: response.tentative_next_day_value,
@@ -172,6 +185,10 @@ const AIChartReader: React.FC = () => {
           confidence: response.confidence || 'Medium',
           key_levels: Array.isArray(response.key_levels) ? response.key_levels : [response.key_levels].filter(Boolean),
           model_used: response.model_used || (provider === 'deepseek' ? 'DeepSeek (V3/R1 Real-time Analysis)' : 'Google Gemini 2.5 Flash'),
+          base_support: response.base_support || response.trader_jargon?.base_support || response.trader_jargon?.support_level,
+          base_resistance: response.base_resistance || response.trader_jargon?.base_resistance || response.trader_jargon?.resistance_level,
+          high_resistance: response.high_resistance || response.trader_jargon?.high_resistance,
+          current_price: response.current_price || response.trader_jargon?.current_price,
           trader_jargon: response.trader_jargon || {},
           detected_ticker: response.detected_ticker
         });
@@ -462,7 +479,10 @@ const AIChartReader: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     <h2 className="text-lg font-extrabold text-white">
-                      {result.detected_ticker || result.ticker ? `${result.detected_ticker || result.ticker} Analysis Readout` : 'Analyst Pattern Readout'}
+                      {activeMode === 'screenshot'
+                        ? (result.detected_ticker ? `${result.detected_ticker} Chart Analysis Readout` : 'AI Chart Screenshot Readout')
+                        : (result.ticker ? `${result.ticker} 5-Day & Next-Day Readout` : '5-Day Analysis Readout')
+                      }
                     </h2>
                   </div>
                   <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
@@ -481,12 +501,12 @@ const AIChartReader: React.FC = () => {
 
               <div className="p-6 space-y-5">
 
-                {/* 1. Quick Last 5 Days Chart Analysis (First) */}
+                {/* 1. Quick Analysis (First) */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                       <LineChart size={15} className="text-blue-400" />
-                      Quick Last 5 Days Chart Analysis
+                      {activeMode === '5day' ? 'Quick Last 5 Days Chart Analysis' : 'AI Chart Pattern & Screenshot Analysis'}
                     </span>
                     <div className="flex items-center gap-2">
                       {result.five_day_return_pct !== undefined && (
@@ -505,6 +525,67 @@ const AIChartReader: React.FC = () => {
                     "{result.quick_5day_analysis || result.plain_language_explanation}"
                   </p>
                 </div>
+
+                {/* Dedicated Key Technical Support & Resistance Levels Grid */}
+                {(result.base_resistance || result.high_resistance || result.base_support || result.trader_jargon?.base_resistance) && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <Shield size={15} className="text-amber-400" />
+                        Key Technical Support & Resistance Levels
+                      </span>
+                      {result.current_price && (
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          Ref Price: <strong className="text-white">{result.current_price}</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Base Support */}
+                      <div className="bg-slate-950/80 border border-cyan-500/30 rounded-xl p-3.5 space-y-1 relative overflow-hidden">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-cyan-400">
+                          <span>Base Support</span>
+                          <span className="text-[9px] bg-cyan-950/80 border border-cyan-500/40 px-1.5 py-0.5 rounded text-cyan-300 uppercase">Demand Floor</span>
+                        </div>
+                        <div className="text-xl font-extrabold text-white font-mono tracking-tight">
+                          {result.base_support || result.trader_jargon?.base_support || result.trader_jargon?.support_level || 'N/A'}
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          Primary support floor where buyers enter and defend pullbacks.
+                        </p>
+                      </div>
+
+                      {/* Base Resistance */}
+                      <div className="bg-slate-950/80 border border-amber-500/40 rounded-xl p-3.5 space-y-1 relative overflow-hidden shadow-xs">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-amber-400">
+                          <span>Base Resistance</span>
+                          <span className="text-[9px] bg-amber-950/80 border border-amber-500/40 px-1.5 py-0.5 rounded text-amber-300 uppercase">First Hurdle</span>
+                        </div>
+                        <div className="text-xl font-extrabold text-amber-200 font-mono tracking-tight">
+                          {result.base_resistance || result.trader_jargon?.base_resistance || result.trader_jargon?.resistance_level || 'N/A'}
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          Immediate price ceiling where initial selling pressure emerges.
+                        </p>
+                      </div>
+
+                      {/* High Resistance */}
+                      <div className="bg-slate-950/80 border border-rose-500/40 rounded-xl p-3.5 space-y-1 relative overflow-hidden shadow-xs">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-rose-400">
+                          <span>High Resistance</span>
+                          <span className="text-[9px] bg-rose-950/80 border border-rose-500/40 px-1.5 py-0.5 rounded text-rose-300 uppercase">Breakout Barrier</span>
+                        </div>
+                        <div className="text-xl font-extrabold text-rose-300 font-mono tracking-tight">
+                          {result.high_resistance || result.trader_jargon?.high_resistance || 'N/A'}
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          Major upper swing barrier and key breakout confirmation level.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 2. Next-Day Analysis & Tentative Value (Second) */}
                 {result.tentative_next_day_value !== undefined && (
@@ -618,12 +699,16 @@ const AIChartReader: React.FC = () => {
                         Internal Technical Metrics
                       </div>
                       <div>• Trend Bias: <span className="text-emerald-400">{result.trader_jargon?.trend_bias || result.technical_bias}</span></div>
+                      {result.current_price && (
+                        <div>• Reference Price: <span className="text-white">{result.current_price}</span></div>
+                      )}
                       {result.trader_jargon?.pivot_level && (
                         <div>• Pivot Level: <span className="text-indigo-300">{result.trader_jargon.pivot_level}</span></div>
                       )}
-                      <div>• Support Floor: <span className="text-cyan-400">{result.trader_jargon?.support_level || 'N/A'}</span></div>
-                      <div>• Resistance Ceiling: <span className="text-rose-400">{result.trader_jargon?.resistance_level || 'N/A'}</span></div>
-                      <div>• Technical Structure: <span className="text-amber-400">{result.trader_jargon?.technical_pattern || '5-Day Trend Progression'}</span></div>
+                      <div>• Base Support: <span className="text-cyan-400">{result.base_support || result.trader_jargon?.base_support || result.trader_jargon?.support_level || 'N/A'}</span></div>
+                      <div>• Base Resistance: <span className="text-amber-400">{result.base_resistance || result.trader_jargon?.base_resistance || result.trader_jargon?.resistance_level || 'N/A'}</span></div>
+                      <div>• High Resistance: <span className="text-rose-400">{result.high_resistance || result.trader_jargon?.high_resistance || 'N/A'}</span></div>
+                      <div>• Technical Structure: <span className="text-amber-400">{result.trader_jargon?.technical_pattern || 'Key Support & Resistance Corridor'}</span></div>
                     </div>
                   )}
                 </div>

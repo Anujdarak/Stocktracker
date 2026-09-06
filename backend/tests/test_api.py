@@ -173,6 +173,29 @@ def test_analyze_5day_chart():
     assert "tentative_next_day_range" in data
     assert data["tentative_next_day_range"]["upper"] >= data["tentative_next_day_range"]["lower"]
     assert len(data.get("five_day_candles", [])) > 0
+    assert "base_resistance" in data
+    assert "high_resistance" in data
+    assert "base_support" in data
+
+def test_analyze_chart_screenshot():
+    import io
+    from PIL import Image
+    img = Image.new('RGB', (100, 100), color='blue')
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_bytes = img_byte_arr.getvalue()
+
+    files = {'image': ('reliance_chart.png', img_bytes, 'image/png')}
+    data = {'context_text': 'Analyzing stock breakout levels'}
+    res = client.post("/api/llm/analyze-chart", files=files, data=data)
+    assert res.status_code == 200
+    res_data = res.json().get("data", {})
+    assert "base_resistance" in res_data
+    assert "high_resistance" in res_data
+    assert "base_support" in res_data
+    assert "trader_jargon" in res_data
+    assert "base_resistance" in res_data["trader_jargon"]
+    assert "high_resistance" in res_data["trader_jargon"]
 
 if __name__ == "__main__":
     tests = [
@@ -193,7 +216,8 @@ if __name__ == "__main__":
         test_corporate_actions_stock,
         test_corporate_actions_upcoming,
         test_ipo_tracker,
-        test_analyze_5day_chart
+        test_analyze_5day_chart,
+        test_analyze_chart_screenshot
     ]
     passed = 0
     for t in tests:
