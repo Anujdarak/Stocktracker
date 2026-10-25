@@ -19,7 +19,8 @@ import {
   Calendar,
   Target,
   LineChart,
-  Shield
+  Shield,
+  Zap
 } from 'lucide-react';
 
 interface AnalysisResult {
@@ -81,8 +82,8 @@ const AIChartReader: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
-  // Engine selection: 'deepseek' or 'gemini'
-  const [provider, setProvider] = useState<'deepseek' | 'gemini'>('gemini');
+  // Engine selection: 'groq'
+  const provider = 'groq';
   const [customApiKey, setCustomApiKey] = useState('');
   const [showKeyInput, setShowKeyInput] = useState(false);
 
@@ -154,7 +155,7 @@ const AIChartReader: React.FC = () => {
           plain_language_explanation: response.quick_5day_analysis || response.plain_language_explanation || 'No plain explanation provided.',
           confidence: response.confidence || 'Medium',
           key_levels: Array.isArray(response.key_levels) ? response.key_levels : [response.key_levels].filter(Boolean),
-          model_used: response.model_used || (provider === 'deepseek' ? 'DeepSeek (V3/R1 Real-time Analysis)' : 'Google Gemini 2.5 Flash'),
+          model_used: response.model_used || 'Groq Vision (qwen/qwen3.8-27b)',
           base_support: response.base_support || response.trader_jargon?.base_support || response.trader_jargon?.support_level,
           base_resistance: response.base_resistance || response.trader_jargon?.base_resistance || response.trader_jargon?.resistance_level,
           high_resistance: response.high_resistance || response.trader_jargon?.high_resistance,
@@ -184,7 +185,7 @@ const AIChartReader: React.FC = () => {
           plain_language_explanation: response.plain_language_explanation || 'No plain explanation provided.',
           confidence: response.confidence || 'Medium',
           key_levels: Array.isArray(response.key_levels) ? response.key_levels : [response.key_levels].filter(Boolean),
-          model_used: response.model_used || (provider === 'deepseek' ? 'DeepSeek (V3/R1 Real-time Analysis)' : 'Google Gemini 2.5 Flash'),
+          model_used: response.model_used || 'Groq Vision (qwen/qwen3.8-27b)',
           base_support: response.base_support || response.trader_jargon?.base_support || response.trader_jargon?.support_level,
           base_resistance: response.base_resistance || response.trader_jargon?.base_resistance || response.trader_jargon?.resistance_level,
           high_resistance: response.high_resistance || response.trader_jargon?.high_resistance,
@@ -241,26 +242,9 @@ const AIChartReader: React.FC = () => {
         <div className="bg-slate-800/80 p-2 rounded-xl border border-slate-700 self-start md:self-auto flex flex-col gap-1.5">
           <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider px-1">AI Engine</span>
           <div className="flex bg-slate-900 p-1 rounded-lg text-xs font-semibold gap-1">
-            <button
-              onClick={() => setProvider('deepseek')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${
-                provider === 'deepseek'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Bot size={14} /> DeepSeek (V3/R1)
-            </button>
-            <button
-              onClick={() => setProvider('gemini')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${
-                provider === 'gemini'
-                  ? 'bg-violet-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Sparkles size={14} /> Gemini 2.5 Flash
-            </button>
+            <div className="px-3 py-1.5 rounded-md flex items-center gap-1.5 bg-emerald-600 text-white shadow-xs">
+              <Zap size={14} /> Groq Vision (qwen/qwen3.8-27b)
+            </div>
           </div>
         </div>
       </div>
@@ -415,7 +399,7 @@ const AIChartReader: React.FC = () => {
               onClick={() => setShowKeyInput(!showKeyInput)}
               className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 font-semibold transition-colors"
             >
-              <Key size={13} /> {showKeyInput ? 'Hide' : 'Use Custom'} DeepSeek API Key (Optional)
+              <Key size={13} /> {showKeyInput ? 'Hide' : 'Use Custom'} Groq API Key (Optional)
               {showKeyInput ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
 
@@ -423,13 +407,13 @@ const AIChartReader: React.FC = () => {
               <div className="mt-2 p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
                 <input
                   type="password"
-                  placeholder="sk-..."
+                  placeholder="gsk_..."
                   value={customApiKey}
                   onChange={(e) => setCustomApiKey(e.target.value)}
                   className="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-emerald-500 text-white placeholder-slate-500"
                 />
                 <p className="text-[10px] text-slate-400 leading-tight">
-                  Leave blank to use the pre-configured system key. Your key is not saved to disk.
+                  Leave blank to use the backend GROQ_API_KEY environment variable. Your key is not saved to disk.
                 </p>
               </div>
             )}

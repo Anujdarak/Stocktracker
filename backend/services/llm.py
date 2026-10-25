@@ -1,10 +1,10 @@
 import os
 import json
 import re
-import requests
+import base64
 import typing
 from typing import Dict, Any, List, Optional
-import google.generativeai as genai
+from groq import Groq
 from dotenv import load_dotenv
 
 try:
@@ -16,17 +16,36 @@ except ImportError:
 
 load_dotenv()
 
-# Configure the Gemini API key if available
-gemini_key = os.getenv("GEMINI_API_KEY")
-if gemini_key:
-    genai.configure(api_key=gemini_key)
 
 class LLMService:
     def __init__(self):
-        self.vision_model_name = "gemini-flash-latest"
-        self.text_model_name = "gemini-flash-latest"
-        self.deepseek_default_base = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-        self.deepseek_default_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        # Official Groq multimodal vision model supporting chart image understanding
+        self.vision_model_name = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
+        # Official Groq high-speed text model
+        self.text_model_name = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
+        self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
+
+    def _get_groq_client(self, api_key: Optional[str] = None) -> Groq:
+        """Get an initialized Groq SDK client instance."""
+        key = api_key.strip() if api_key else (os.getenv("GROQ_API_KEY", "").strip() or self.groq_api_key)
+        if not key:
+            raise ValueError("GROQ_API_KEY is not configured. Please set GROQ_API_KEY in the backend environment.")
+        return Groq(api_key=key)
+
+    def _encode_image(self, image_path: str) -> tuple[str, str]:
+        """Encode local image file to base64 string and detect mime type."""
+        ext = os.path.splitext(image_path)[1].lower()
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".gif": "image/gif"
+        }
+        mime_type = mime_map.get(ext, "image/jpeg")
+        with open(image_path, "rb") as image_file:
+            encoded = base64.b64encode(image_file.read()).decode("utf-8")
+        return encoded, mime_type
 
     def _extract_json(self, text: str) -> dict:
         """Robustly extract JSON object from LLM response text."""
@@ -45,90 +64,84 @@ class LLMService:
                 return json.loads(cleaned[start:end+1])
             raise
 
-    def _call_deepseek(self, prompt: str, system_prompt: str, api_key: Optional[str] = None) -> dict:
-        """Send prompt to DeepSeek API endpoint."""
-        key = api_key.strip() if api_key else self.deepseek_default_key
-        if not key:
-            raise ValueError("DeepSeek API key is required. Please provide it in .env or via the interface.")
+    def _call_groq_text(self, prompt: str, system_instruction: str, api_key: Optional[str] = None) -> dict:
+        """Send prompt to Groq text generation model using the official Groq SDK."""
+        client = self._get_groq_client(api_key)
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
 
-        url = f"{self.deepseek_default_base}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}"
-        }
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"}
-        }
-
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        if response.status_code != 200:
-            raise Exception(f"DeepSeek API error ({response.status_code}): {response.text}")
-
-        res_json = response.json()
-        content = res_json["choices"][0]["message"]["content"]
+        response = client.chat.completions.create(
+            model=self.text_model_name,
+            messages=messages,
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        )
+        content = response.choices[0].message.content or ""
         return self._extract_json(content)
 
-    def _call_gemini_text(self, prompt: str, system_instruction: str) -> dict:
-        """Send prompt to Gemini text generation model."""
-        if not os.getenv("GEMINI_API_KEY"):
-            raise ValueError("Gemini API key is not configured.")
-        generation_config = genai.types.GenerationConfig(
-            response_mime_type="application/json",
-            temperature=0.2
+    def _call_groq_vision(
+        self,
+        image_path: str,
+        prompt: str,
+        system_instruction: str,
+        api_key: Optional[str] = None
+    ) -> dict:
+        """Analyze image with prompt using Groq vision-capable model."""
+        client = self._get_groq_client(api_key)
+        encoded_image, mime_type = self._encode_image(image_path)
+        data_url = f"data:{mime_type};base64,{encoded_image}"
+
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": data_url
+                    }
+                }
+            ]
+        })
+
+        response = client.chat.completions.create(
+            model=self.vision_model_name,
+            messages=messages,
+            temperature=0.2,
+            response_format={"type": "json_object"}
         )
-        model = genai.GenerativeModel(
-            model_name=self.text_model_name,
-            generation_config=generation_config,
-            system_instruction=system_instruction
-        )
-        response = model.generate_content([prompt])
-        return self._extract_json(response.text)
+        content = response.choices[0].message.content or ""
+        return self._extract_json(content)
 
     def _cascade_llm_call(
         self,
         prompt: str,
         system_instruction: str,
-        preferred_provider: str = "deepseek",
+        preferred_provider: str = "groq",
         api_key: Optional[str] = None,
         fallback_factory: Optional[typing.Callable[[], dict]] = None
     ) -> dict:
         """
-        Round-robin / Cascade Strategy:
-        1. When credits/keys are available, use paid AI provider (DeepSeek / Gemini).
-        2. If primary provider fails or has 0 credits, immediately try the alternate provider.
-        3. If all external APIs are out of credits or unavailable, seamlessly switch to the free autonomous feature.
+        AI Call Strategy:
+        1. When GROQ_API_KEY is available, use Groq API.
+        2. If Groq API fails or key is missing, seamlessly switch to the autonomous feature.
         """
-        preferred = (preferred_provider or "deepseek").lower()
-        provider_order = ["deepseek", "gemini"] if preferred == "deepseek" else ["gemini", "deepseek"]
+        key = api_key.strip() if api_key else (os.getenv("GROQ_API_KEY", "").strip() or self.groq_api_key)
+        if key:
+            try:
+                res = self._call_groq_text(prompt, system_instruction, api_key=key)
+                res["model_used"] = f"Groq API ({self.text_model_name})"
+                res["engine_mode"] = "paid_credits"
+                return res
+            except Exception as e:
+                print(f"[Groq LLM] API call failed ({e}), cascading to autonomous fallback...")
 
-        for prov in provider_order:
-            if prov == "deepseek":
-                key = api_key.strip() if api_key else self.deepseek_default_key
-                if key:
-                    try:
-                        res = self._call_deepseek(prompt, system_instruction, api_key=key)
-                        res["model_used"] = "DeepSeek API (Active Credits)"
-                        res["engine_mode"] = "paid_credits"
-                        return res
-                    except Exception as e:
-                        print(f"[Round-Robin Cascade] DeepSeek out of credits or failed ({e}), cascading to next provider...")
-            elif prov == "gemini":
-                if os.getenv("GEMINI_API_KEY"):
-                    try:
-                        res = self._call_gemini_text(prompt, system_instruction)
-                        res["model_used"] = "Google Gemini 2.5 Flash (Active Credits)"
-                        res["engine_mode"] = "paid_credits"
-                        return res
-                    except Exception as e:
-                        print(f"[Round-Robin Cascade] Gemini out of credits or failed ({e}), cascading to next...")
-
-        # If both fail or have no credits, seamlessly use the free autonomous feature
+        # Autonomous fallback when external API unavailable
         if fallback_factory:
             res = fallback_factory()
             if "model_used" not in res:
@@ -136,25 +149,49 @@ class LLMService:
             res["engine_mode"] = "free_tier"
             return res
 
-        raise Exception("All AI engines and autonomous fallbacks failed.")
+        raise Exception("Groq AI engine and autonomous fallback failed.")
 
-    def _extract_visual_features_with_gemini(self, image_path: str) -> str:
-        """Extract visual chart characteristics and price levels using Gemini Vision."""
+    def _extract_visual_features_with_groq(self, image_path: str, api_key: Optional[str] = None) -> str:
+        """Extract visual chart characteristics and price levels using Groq Vision."""
         try:
-            from PIL import Image
-            image = Image.open(image_path)
-            model = genai.GenerativeModel(model_name=self.vision_model_name)
-            res = model.generate_content([
-                "Describe in detail the stock chart shown in this image:\n"
-                "1. Look closely at the top-left, title, header, watermark, or axis labels for any stock ticker symbol or company name (e.g. RELIANCE, TCS, INFY, HDFCBANK, NIFTY 50, TATAMOTORS, etc.). Clearly specify the detected ticker.\n"
-                "2. Read the price values on the vertical right/left price axis: Current price, Base Support (foundational lower floor), Base Resistance (immediate hurdle / first resistance ceiling), and High Resistance (major upper peak / breakout barrier).\n"
-                "3. Overall visible price trajectory (upward, downward, sideways/consolidation).\n"
-                "4. Recent candlestick structures, key levels, and moving average lines visible.",
-                image
-            ])
-            return res.text
+            client = self._get_groq_client(api_key)
+            encoded_image, mime_type = self._encode_image(image_path)
+            data_url = f"data:{mime_type};base64,{encoded_image}"
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Describe in detail the stock chart shown in this image:\n"
+                                "1. Look closely at the top-left, title, header, watermark, or axis labels for any stock ticker symbol or company name (e.g. RELIANCE, TCS, INFY, HDFCBANK, NIFTY 50, TATAMOTORS, etc.). Clearly specify the detected ticker.\n"
+                                "2. Read the price values on the vertical right/left price axis: Current price, Base Support (foundational lower floor), Base Resistance (immediate hurdle / first resistance ceiling), and High Resistance (major upper peak / breakout barrier).\n"
+                                "3. Overall visible price trajectory (upward, downward, sideways/consolidation).\n"
+                                "4. Recent candlestick structures, key levels, and moving average lines visible."
+                            )
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": data_url
+                            }
+                        }
+                    ]
+                }
+            ]
+            response = client.chat.completions.create(
+                model=self.vision_model_name,
+                messages=messages,
+                temperature=0.2
+            )
+            return response.choices[0].message.content or ""
         except Exception as e:
             return f"Chart visual feature extraction: {str(e)}"
+
+    # Retain method alias for backward compatibility
+    _extract_visual_features_with_gemini = _extract_visual_features_with_groq
+
     def _resolve_symbol(self, candidate: Optional[str]) -> Optional[str]:
         """Robustly resolve ticker symbols and company names to standard .NS symbols."""
         if not candidate:
@@ -328,12 +365,12 @@ class LLMService:
         image_path: str,
         context_text: str = "",
         ticker: Optional[str] = None,
-        provider: str = "gemini",
+        provider: str = "groq",
         api_key: Optional[str] = None
     ) -> dict:
         """
         Analyze a stock chart image along with market context text.
-        Supports DeepSeek API real-time reasoning and Gemini Vision.
+        Uses Groq Vision API (qwen/qwen3.8-27b).
         Extracts detected ticker, base support, base resistance, high resistance, and technical pattern.
         """
         grounded_data_summary = ""
@@ -417,56 +454,20 @@ Return JSON with exactly these fields:
 }}
 """
 
-        # Round-robin cascade:
-        has_deepseek = bool(api_key or self.deepseek_default_key)
-        has_gemini = bool(os.getenv("GEMINI_API_KEY"))
-
-        if (provider or "").lower() == "deepseek" and has_deepseek:
-            provider_order = ["deepseek", "gemini"]
-        elif (provider or "").lower() == "gemini" and has_gemini:
-            provider_order = ["gemini", "deepseek"]
-        elif has_gemini:
-            provider_order = ["gemini", "deepseek"]
-        else:
-            provider_order = ["deepseek", "gemini"]
-
-        for prov in provider_order:
-            if prov == "deepseek":
-                has_key = bool(api_key or self.deepseek_default_key)
-                if has_key:
-                    try:
-                        visual_features = self._extract_visual_features_with_gemini(image_path)
-                        full_deepseek_prompt = (
-                            f"{prompt_template}\n\n"
-                            f"Visual features observed in chart screenshot:\n{visual_features}"
-                        )
-                        result = self._call_deepseek(full_deepseek_prompt, system_instruction, api_key=api_key)
-                        result["model_used"] = "DeepSeek (V3/R1 Real-time Analysis)"
-                        result["engine_mode"] = "paid_credits"
-                        return self._post_process_chart_result(result, explicit_ticker=ticker, image_path=image_path, context_text=context_text)
-                    except Exception as e:
-                        print(f"[Round-Robin Cascade] DeepSeek chart failed ({e}), cascading to next provider...")
-            elif prov == "gemini":
-                if os.getenv("GEMINI_API_KEY"):
-                    try:
-                        from PIL import Image
-                        image = Image.open(image_path)
-                        generation_config = genai.types.GenerationConfig(
-                            response_mime_type="application/json",
-                            temperature=0.2
-                        )
-                        model = genai.GenerativeModel(
-                            model_name=self.vision_model_name,
-                            generation_config=generation_config,
-                            system_instruction=system_instruction
-                        )
-                        response = model.generate_content([prompt_template, image])
-                        result = self._extract_json(response.text)
-                        result["model_used"] = "Google Gemini 2.5 Flash (Vision Grounded)"
-                        result["engine_mode"] = "paid_credits"
-                        return self._post_process_chart_result(result, explicit_ticker=ticker, image_path=image_path, context_text=context_text)
-                    except Exception as e:
-                        print(f"[Round-Robin Cascade] Gemini Vision failed ({e}), cascading to free feature...")
+        key = api_key.strip() if api_key else (os.getenv("GROQ_API_KEY", "").strip() or self.groq_api_key)
+        if key:
+            try:
+                result = self._call_groq_vision(
+                    image_path=image_path,
+                    prompt=prompt_template,
+                    system_instruction=system_instruction,
+                    api_key=key
+                )
+                result["model_used"] = f"Groq Vision ({self.vision_model_name})"
+                result["engine_mode"] = "paid_credits"
+                return self._post_process_chart_result(result, explicit_ticker=ticker, image_path=image_path, context_text=context_text)
+            except Exception as e:
+                print(f"[Groq Vision] API call failed ({e}), cascading to autonomous fallback...")
 
         # Tier 3: Zero-Credit Autonomous Technical Engine (Grounds with real OHLCV & technical levels)
         fallback_res = {
@@ -487,7 +488,7 @@ Return JSON with exactly these fields:
         self,
         ticker: str,
         user_query: str = "I want last analysis of the next day",
-        provider: str = "deepseek",
+        provider: str = "groq",
         api_key: Optional[str] = None
     ) -> dict:
         """
@@ -684,7 +685,7 @@ Provide a comprehensive analysis returned as a JSON object with EXACTLY these ke
     def analyze_news_impact(self, news_headlines: list, ticker: str) -> dict:
         """
         Assess what upcoming news or results mean for the stock.
-        Returns a structured JSON response in plain language.
+        Returns a structured JSON response in plain language using Groq.
         """
         system_instruction = (
             "You are a plain-spoken market analyst. Assess the impact of recent news headlines on a stock. "
@@ -715,7 +716,7 @@ Return a JSON object with exactly these fields:
             full_text = " ".join(news_headlines).lower()
             pos_count = sum(full_text.count(w) for w in pos_words)
             neg_count = sum(full_text.count(w) for w in neg_words)
-            
+
             sentiment = "positive" if pos_count > neg_count else ("negative" if neg_count > pos_count else "neutral")
             severity = 4 if abs(pos_count - neg_count) >= 2 else 3
 
@@ -726,13 +727,12 @@ Return a JSON object with exactly these fields:
                 "plain_language_explanation": f"Recent developments indicate {sentiment} momentum for {ticker}. Market sentiment is currently digesting the operational updates and revenue metrics."
             }
 
-        return self._cascade_llm_call(prompt, system_instruction, preferred_provider="deepseek", fallback_factory=_free_news_fallback)
+        return self._cascade_llm_call(prompt, system_instruction, preferred_provider="groq", fallback_factory=_free_news_fallback)
 
     def analyze_quarterly_results(self, ticker: str, results_details: str) -> dict:
         """
-        Page 5 Feature: Quarterly results & corporate deals impact tracker.
+        Quarterly results & corporate deals impact tracker.
         Classifies recent results as strong / weak / mixed (YoY revenue/profit) in plain language.
-        Round-robin cascading across paid credits and free fallback.
         """
         system_instruction = (
             "You are an expert financial journalist explaining quarterly financial results to everyday citizens. "
@@ -764,9 +764,9 @@ Return a JSON object with exactly these fields:
             details_lower = results_details.lower()
             is_strong = any(w in details_lower for w in ["surged", "rose", "growth", "jumped", "expand", "acqui"])
             is_weak = any(w in details_lower for w in ["declined", "fell", "dropped", "loss", "contract"])
-            
+
             classification = "strong" if (is_strong and not is_weak) else ("weak" if is_weak and not is_strong else "mixed")
-            
+
             # Simple regex for YoY numbers
             yoy_matches = re.findall(r'(\d+(?:\.\d+)?%\s*YoY)', results_details, re.IGNORECASE)
             rev_growth = yoy_matches[0] if len(yoy_matches) > 0 else ("Positive Growth" if classification == "strong" else "Steady")
@@ -784,12 +784,11 @@ Return a JSON object with exactly these fields:
                 "historical_context": "Market participants historically digest earnings surprises within 1-2 trading sessions."
             }
 
-        return self._cascade_llm_call(prompt, system_instruction, preferred_provider="deepseek", fallback_factory=_free_results_fallback)
+        return self._cascade_llm_call(prompt, system_instruction, preferred_provider="groq", fallback_factory=_free_results_fallback)
 
-    def analyze_portfolio_health(self, portfolio_data: dict, provider: str = "deepseek", api_key: str = None) -> dict:
+    def analyze_portfolio_health(self, portfolio_data: dict, provider: str = "groq", api_key: Optional[str] = None) -> dict:
         """
         Generates an educational risk and diversification diagnostic for a user's portfolio.
-        Round-robin cascading across paid credits and free fallback.
         """
         system_instruction = (
             "You are a portfolio risk educator for everyday Indian retail investors. "
@@ -825,6 +824,5 @@ Return JSON:
 
         return self._cascade_llm_call(prompt, system_instruction, preferred_provider=provider, api_key=api_key, fallback_factory=_free_portfolio_fallback)
 
+
 llm_service = LLMService()
-
-

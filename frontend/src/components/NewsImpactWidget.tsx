@@ -59,7 +59,7 @@ const NewsImpactWidget: React.FC<NewsImpactWidgetProps> = ({ ticker }) => {
           return;
         }
 
-        // 3. Send to Gemini/LLM abstraction
+        // 3. Send to Groq/LLM abstraction
         const analysisData = await llmService.analyzeNews(ticker, headlines);
 
         if (isMounted) {

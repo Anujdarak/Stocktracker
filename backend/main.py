@@ -11,15 +11,25 @@ if current_dir not in sys.path:
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
+from contextlib import asynccontextmanager
+
 try:
-    from backend.routers import market, search, news, llm, corporate_actions
+    from backend.routers import market, search, news, llm, corporate_actions, auth, user_data
+    from backend.services.db import init_db
 except ImportError:
-    from routers import market, search, news, llm, corporate_actions
+    from routers import market, search, news, llm, corporate_actions, auth, user_data
+    from services.db import init_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
 app = FastAPI(
     title="MarketPulse API",
     description="Backend API for MarketPulse MVP",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Configure CORS for local development
@@ -37,6 +47,8 @@ app.include_router(search.router)
 app.include_router(news.router)
 app.include_router(llm.router)
 app.include_router(corporate_actions.router)
+app.include_router(auth.router)
+app.include_router(user_data.router)
 
 @app.get("/")
 def root():

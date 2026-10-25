@@ -6,6 +6,15 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+// Attach JWT token automatically to all requests if present in localStorage
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('marketpulse_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const searchService = {
   searchEquities: async (query: string) => {
     try {
@@ -178,7 +187,7 @@ export const llmService = {
     }
   },
 
-  getPortfolioDiagnostic: async (portfolioData: any, provider = "deepseek", apiKey?: string) => {
+  getPortfolioDiagnostic: async (portfolioData: any, provider = "groq", apiKey?: string) => {
     try {
       const { data } = await api.post('/llm/portfolio-diagnostic', {
         portfolio_data: portfolioData,
@@ -272,5 +281,72 @@ export const corporateActionsService = {
       console.error("IPO tracker fetch error", error);
       return null;
     }
+  }
+};
+
+export const authService = {
+  register: async (payload: { name: string; email: string; password: string; confirm_password: string }) => {
+    const { data } = await api.post('/auth/register', payload);
+    return data.data;
+  },
+
+  login: async (payload: { email: string; password: string }) => {
+    const { data } = await api.post('/auth/login', payload);
+    return data.data;
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Ignore network errors on logout
+    }
+  },
+
+  getMe: async () => {
+    const { data } = await api.get('/auth/me');
+    return data.data;
+  }
+};
+
+export const userDataService = {
+  getWatchlist: async () => {
+    const { data } = await api.get('/watchlist');
+    return data.data || [];
+  },
+
+  addToWatchlist: async (ticker: string) => {
+    const { data } = await api.post('/watchlist', { ticker });
+    return data.data || [];
+  },
+
+  removeFromWatchlist: async (ticker: string) => {
+    const { data } = await api.delete(`/watchlist/${encodeURIComponent(ticker)}`);
+    return data.data || [];
+  },
+
+  syncWatchlist: async (tickers: string[]) => {
+    const { data } = await api.post('/user/watchlist/sync', { tickers });
+    return data.data || [];
+  },
+
+  getPreferences: async () => {
+    const { data } = await api.get('/user/preferences');
+    return data.data || {};
+  },
+
+  updatePreferences: async (settings: any) => {
+    const { data } = await api.put('/user/preferences', { settings });
+    return data.data || {};
+  },
+
+  getAnalysisHistory: async (limit: number = 20) => {
+    const { data } = await api.get(`/user/analysis-history?limit=${limit}`);
+    return data.data || [];
+  },
+
+  deleteAnalysisRecord: async (recordId: string) => {
+    const { data } = await api.delete(`/user/analysis-history/${recordId}`);
+    return data;
   }
 };

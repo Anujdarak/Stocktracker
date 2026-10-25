@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import shutil
@@ -8,9 +8,13 @@ import uuid
 try:
     from services.llm import llm_service
     from services.quarterly import quarterly_service
+    from services.auth import get_optional_user
+    from services.user_data import save_analysis_history
 except ImportError:
     from backend.services.llm import llm_service
     from backend.services.quarterly import quarterly_service
+    from backend.services.auth import get_optional_user
+    from backend.services.user_data import save_analysis_history
 
 router = APIRouter(prefix="/api/llm", tags=["LLM AI Features"])
 
@@ -30,11 +34,12 @@ async def analyze_chart(
     image: UploadFile = File(...),
     ticker: Optional[str] = Form(None),
     context_text: Optional[str] = Form(""),
-    provider: str = Form("deepseek"),
-    api_key: Optional[str] = Form(None)
+    provider: str = Form("groq"),
+    api_key: Optional[str] = Form(None),
+    current_user: Optional[dict] = Depends(get_optional_user)
 ):
     """
-    Endpoint for AI Chart Reader using DeepSeek API or Gemini Vision.
+    Endpoint for AI Chart Reader using Groq Vision API.
     Provide the chart screenshot, optional ticker, and optional user context.
     """
     temp_file_path = f"temp_uploads/{uuid.uuid4()}_{image.filename}"
@@ -51,6 +56,19 @@ async def analyze_chart(
             provider=provider,
             api_key=api_key
         )
+
+        # Automatically persist analysis to user's MongoDB history if logged in
+        if current_user and current_user.get("id"):
+            try:
+                save_analysis_history(
+                    user_id=current_user["id"],
+                    ticker=ticker,
+                    analysis_type="chart_screenshot",
+                    data=result
+                )
+            except Exception:
+                pass
+
         return {"status": "success", "data": result}
 
     except Exception as e:
@@ -66,11 +84,14 @@ async def analyze_chart(
 class FiveDayAnalysisRequest(BaseModel):
     ticker: str
     user_query: Optional[str] = "I want last analysis of the next day"
-    provider: Optional[str] = "deepseek"
+    provider: Optional[str] = "groq"
     api_key: Optional[str] = None
 
 @router.post("/analyze-5day-chart")
-async def analyze_5day_chart(payload: FiveDayAnalysisRequest):
+async def analyze_5day_chart(
+    payload: FiveDayAnalysisRequest,
+    current_user: Optional[dict] = Depends(get_optional_user)
+):
     """
     Endpoint for 5-Day Chart Analysis & Next-Day Tentative Value projection.
     Analyzes historical 5-day candlestick trends, price patterns, and forecasts next-day range.
@@ -79,9 +100,22 @@ async def analyze_5day_chart(payload: FiveDayAnalysisRequest):
         result = llm_service.analyze_five_day_chart(
             ticker=payload.ticker,
             user_query=payload.user_query or "I want last analysis of the next day",
-            provider=payload.provider or "deepseek",
+            provider=payload.provider or "groq",
             api_key=payload.api_key
         )
+
+        # Automatically persist analysis to user's MongoDB history if logged in
+        if current_user and current_user.get("id"):
+            try:
+                save_analysis_history(
+                    user_id=current_user["id"],
+                    ticker=payload.ticker,
+                    analysis_type="5day_chart",
+                    data=result
+                )
+            except Exception:
+                pass
+
         return {"status": "success", "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"5-day chart analysis failed: {str(e)}")
@@ -135,7 +169,7 @@ async def analyze_results_impact(payload: ResultsImpactRequest):
 
 class PortfolioDiagnosticRequest(BaseModel):
     portfolio_data: Dict[str, Any]
-    provider: Optional[str] = "deepseek"
+    provider: Optional[str] = "groq"
     api_key: Optional[str] = None
 
 @router.post("/portfolio-diagnostic")
@@ -146,7 +180,7 @@ async def analyze_portfolio_diagnostic(payload: PortfolioDiagnosticRequest):
     try:
         result = llm_service.analyze_portfolio_health(
             portfolio_data=payload.portfolio_data,
-            provider=payload.provider or "deepseek",
+            provider=payload.provider or "groq",
             api_key=payload.api_key
         )
         return {"status": "success", "data": result}

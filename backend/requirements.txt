@@ -5,10 +5,15 @@ yfinance
 feedparser
 beautifulsoup4
 lxml
-google-generativeai
+groq
 python-dotenv
 requests
 pillow
 openai
 pytest
 curl-cffi
+pymongo
+bcrypt
+pyjwt
+mongomock
+dnspython

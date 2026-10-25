@@ -1,0 +1,3 @@
+@echo off
+echo Starting MarketPulse MERN Node.js Express Server...
+npm --prefix server start

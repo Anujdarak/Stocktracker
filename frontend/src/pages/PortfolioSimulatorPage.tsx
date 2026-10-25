@@ -31,7 +31,7 @@ export const PortfolioSimulatorPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   // AI Diagnostic
-  const [aiProvider, setAiProvider] = useState<'deepseek' | 'gemini'>('deepseek');
+  const aiProvider = 'groq';
   const [aiDiagnostic, setAiDiagnostic] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -393,30 +393,9 @@ export const PortfolioSimulatorPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Provider Selector */}
-              <div className="flex items-center bg-slate-950 rounded-lg p-0.5 border border-slate-800 text-[11px]">
-                <button
-                  onClick={() => {
-                    setAiProvider('deepseek');
-                    if (portfolioData) loadAiDiagnostic(portfolioData);
-                  }}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
-                    aiProvider === 'deepseek' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400'
-                  }`}
-                >
-                  DeepSeek
-                </button>
-                <button
-                  onClick={() => {
-                    setAiProvider('gemini');
-                    if (portfolioData) loadAiDiagnostic(portfolioData);
-                  }}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
-                    aiProvider === 'gemini' ? 'bg-blue-600 text-white font-medium' : 'text-slate-400'
-                  }`}
-                >
-                  Gemini
-                </button>
+              {/* Provider Badge */}
+              <div className="flex items-center bg-slate-950 rounded-lg px-2.5 py-1 border border-slate-800 text-[11px] text-emerald-400 font-semibold gap-1">
+                <span>Groq LPU</span>
               </div>
             </div>
 

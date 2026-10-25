@@ -114,7 +114,7 @@ def test_portfolio_diagnostic_llm():
             "stress_tests": [{"title": "RBI Rate Hike", "estimated_impact_percent": -1.2}],
             "concentration_warnings": ["65% concentration in IT"]
         },
-        "provider": "gemini"
+        "provider": "groq"
     })
     assert res.status_code == 200
     data = res.json().get("data", {})

@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build",
-    "frontend": "npm --prefix frontend run dev"
+    "server": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
+    "frontend": "npm --prefix frontend run dev",
+    "client": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build"
   }
 }
