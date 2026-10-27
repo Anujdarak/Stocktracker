@@ -1,7 +1,11 @@
 # Proximity MarketPulse - Full-Stack MERN Stock Tracker
 
 Live Production Deployment:
-- **Frontend (Vercel):** [https://stocktracker-self.vercel.app](https://stocktracker-self.vercel.app/?_vercel_share=qBwwfUOJFzY7JXaxlo0lXsKw43XAeaUG)
+- **Deployment link:** [https://stocktracker-self.vercel.app](https://stocktracker-self.vercel.app/?_vercel_share=qBwwfUOJFzY7JXaxlo0lXsKw43XAeaUG)
+
+- ** google drive link**:https://drive.google.com/drive/folders/1C-mulr6owdEuv7yjUUj41BqCrQh9rrtB
+
+- 
 
 ---
 
