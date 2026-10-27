@@ -8,7 +8,7 @@
     "backend": "npm --prefix backend start",
     "frontend": "npm --prefix frontend run dev",
     "client": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
     "start": "node backend/src/index.js",
     "test": "node backend/test-server.js"
   }

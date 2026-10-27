@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { llmService } from '../services/llmService.js';
 import { QuarterlyResultsService } from '../services/quarterlyService.js';
 import { optionalAuthenticate } from '../middleware/auth.js';
@@ -9,7 +10,7 @@ import { saveAnalysisHistory } from '../services/userDataService.js';
 
 const router = express.Router();
 
-const uploadDir = path.resolve('temp_uploads');
+const uploadDir = path.join(os.tmpdir(), 'marketpulse_uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

@@ -4,8 +4,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 
-import { connectDB } from './config/db.js';
+import { connectDB, getDbStatus } from './config/db.js';
 import marketRouter from './routes/market.js';
 import searchRouter from './routes/search.js';
 import newsRouter from './routes/news.js';
@@ -34,24 +35,44 @@ for (const p of envPaths) {
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Middleware
+// Production-ready CORS configuration:
+// Reflect origin so that Vercel frontends (e.g. *.vercel.app), preview deployments,
+// and localhost can make authenticated requests without triggering browser wildcard CORS errors.
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // Allow all origins (including non-browser tools with undefined origin)
+    callback(null, true);
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['*']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
+
+// Preflight handler
+app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health and Root
 app.get(['/', '/api'], (req, res) => {
-  res.json({ message: 'Welcome to Proximity MarketPulse API', status: 'online' });
+  res.json({
+    message: 'Welcome to Proximity MarketPulse API',
+    status: 'online',
+    database: getDbStatus()
+  });
 });
 
 app.get(['/health', '/api/health'], (req, res) => {
-  res.json({ status: 'healthy', service: 'Proximity MarketPulse API' });
+  const db = getDbStatus();
+  res.json({
+    status: 'healthy',
+    service: 'Proximity MarketPulse API',
+    environment: process.env.NODE_ENV || 'development',
+    database: db,
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Mount Routers
@@ -80,11 +101,30 @@ app.use((err, req, res, next) => {
 
 // Start Server
 async function startServer() {
+  // Connect to MongoDB Atlas (or fallback to in-memory store) before opening port
   await connectDB();
 
-  app.listen(PORT, () => {
-    console.log(`🚀 Proximity Node/Express Server running on http://127.0.0.1:${PORT}`);
+  // Explicitly bind to '0.0.0.0' for compatibility with Render, Docker, and Linux cloud hosts
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Proximity Node/Express Server running on port ${PORT} (0.0.0.0:${PORT})`);
   });
+
+  // Graceful shutdown on cloud redeploy/termination signals
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received. Closing HTTP server and database connections...`);
+    server.close(async () => {
+      try {
+        await mongoose.connection.close();
+        console.log('MongoDB connection closed.');
+      } catch (err) {
+        console.error('Error closing MongoDB connection:', err.message);
+      }
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 startServer();

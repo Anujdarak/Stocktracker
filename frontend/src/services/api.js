@@ -1,6 +1,24 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+/**
+ * Resolves the backend API base URL:
+ * - If VITE_API_URL is configured (e.g. 'https://your-backend.onrender.com' or 'https://your-backend.onrender.com/api'),
+ *   it strips any trailing slash and ensures '/api' is present so all endpoint paths (/market, /auth, etc.) resolve cleanly.
+ * - If VITE_API_URL is empty (local dev with Vite proxy), defaults to '/api'.
+ */
+function resolveApiBaseUrl() {
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim();
+  if (!envUrl) {
+    return '/api';
+  }
+  let cleanUrl = envUrl.replace(/\/+$/, '');
+  if (!cleanUrl.endsWith('/api')) {
+    cleanUrl = `${cleanUrl}/api`;
+  }
+  return cleanUrl;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,6 +32,25 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Handle edge cases such as Vercel returning index.html when VITE_API_URL was omitted
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const contentType = error.response?.headers?.['content-type'] || '';
+    if (
+      contentType.includes('text/html') &&
+      typeof error.response?.data === 'string' &&
+      error.response.data.includes('<!DOCTYPE html>')
+    ) {
+      console.warn(
+        '⚠️ Received HTML response from API endpoint. ' +
+        'Please verify that VITE_API_URL in your Vercel Environment Variables points to your deployed Render backend (e.g., https://<your-backend>.onrender.com/api).'
+      );
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const searchService = {
   searchEquities: async (query) => {

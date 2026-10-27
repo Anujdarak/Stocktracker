@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: proximity-marketpulse-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_DB_NAME
+        value: stocktracker
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_VISION_MODEL
+        value: qwen/qwen3.8-27b
+      - key: GROQ_TEXT_MODEL
+        value: llama-3.3-70b-versatile
