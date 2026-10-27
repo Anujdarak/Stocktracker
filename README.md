@@ -3,7 +3,7 @@
 Live Production Deployment:
 - **Deployment link:** [https://stocktracker-self.vercel.app](https://stocktracker-self.vercel.app/?_vercel_share=qBwwfUOJFzY7JXaxlo0lXsKw43XAeaUG)
 
-- ** google drive link**:https://drive.google.com/drive/folders/1C-mulr6owdEuv7yjUUj41BqCrQh9rrtB
+- ** google drive link**:https://drive.google.com/file/d/10Jn86lX6VecgCuHLcW31Ou1vwP46IBUO/view?usp=drivesdk
 
 - 
 
