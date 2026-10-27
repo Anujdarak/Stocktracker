@@ -17,11 +17,11 @@ async function runTests() {
     console.log('⏳ Backend not running. Starting background instance on port 8000...');
     serverProcess = spawn(process.execPath, ['backend/src/index.js'], {
       env: { ...process.env, PORT: '8000' },
-      stdio: 'pipe'
+      stdio: 'inherit'
     });
 
     let isReady = false;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 500));
       try {
         const check = await axios.get(`${BASE_URL}/health`, { timeout: 1000 });
