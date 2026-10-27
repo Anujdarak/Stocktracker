@@ -54,8 +54,8 @@ app.options('*', cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health and Root
-app.get(['/', '/api'], (req, res) => {
+// API Root
+app.get('/api', (req, res) => {
   res.json({
     message: 'Welcome to Proximity MarketPulse API',
     status: 'online',
@@ -86,6 +86,44 @@ app.use('/api/corporate-actions', corporateActionsRouter);
 app.use('/api/llm', llmRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', userRouter);
+
+// Locate built frontend dist directory
+const distCandidates = [
+  path.resolve(__dirname, '../../dist'),
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(process.cwd(), 'dist'),
+  path.resolve(process.cwd(), 'frontend/dist')
+];
+
+let distPath = null;
+for (const p of distCandidates) {
+  if (fs.existsSync(p) && fs.existsSync(path.join(p, 'index.html'))) {
+    distPath = p;
+    break;
+  }
+}
+
+if (distPath) {
+  console.log(`📁 Serving frontend static files from: ${distPath}`);
+  app.use(express.static(distPath));
+
+  // SPA fallback for frontend client-side routes
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  // If no built frontend is available, root returns API status
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'Welcome to Proximity MarketPulse API',
+      status: 'online',
+      database: getDbStatus()
+    });
+  });
+}
 
 // 404 handler for undefined routes
 app.use((req, res) => {
