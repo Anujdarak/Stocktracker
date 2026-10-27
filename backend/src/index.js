@@ -64,6 +64,9 @@ app.get(['/', '/api'], (req, res) => {
 });
 
 app.get(['/health', '/api/health'], (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    connectDB().catch(() => {});
+  }
   const db = getDbStatus();
   res.json({
     status: 'healthy',

@@ -13,12 +13,18 @@ const _inMemoryDb = {
 let isConnected = false;
 let usingMemoryFallback = false;
 let lastConnectionError = null;
+let isConnecting = false;
+let reconnectTimer = null;
 
 // Configure connection event listeners
 mongoose.connection.on('connected', () => {
   isConnected = true;
   usingMemoryFallback = false;
   lastConnectionError = null;
+  if (reconnectTimer) {
+    clearInterval(reconnectTimer);
+    reconnectTimer = null;
+  }
   console.log(`✅ Successfully connected to MongoDB Atlas (database: ${mongoose.connection.name})`);
 });
 
@@ -42,6 +48,12 @@ export async function connectDB() {
     return;
   }
 
+  // Already connected or in the process of connecting
+  if (mongoose.connection.readyState === 1 || isConnecting || mongoose.connection.readyState === 2) {
+    return;
+  }
+
+  isConnecting = true;
   // Strip accidental enclosing single or double quotes
   const uri = rawUri.trim().replace(/^["']|["']$/g, '');
 
@@ -59,6 +71,10 @@ export async function connectDB() {
     isConnected = true;
     usingMemoryFallback = false;
     lastConnectionError = null;
+    if (reconnectTimer) {
+      clearInterval(reconnectTimer);
+      reconnectTimer = null;
+    }
   } catch (err) {
     lastConnectionError = err.message;
     console.error(`⚠️ MongoDB Atlas connection error: ${err.message}`);
@@ -86,6 +102,21 @@ export async function connectDB() {
 
     console.warn('⚡ Operating with in-memory store fallback so HTTP endpoints remain active.');
     usingMemoryFallback = true;
+
+    // Schedule background retry every 10 seconds if not already scheduled
+    if (!reconnectTimer) {
+      reconnectTimer = setInterval(async () => {
+        if (mongoose.connection.readyState === 1) {
+          clearInterval(reconnectTimer);
+          reconnectTimer = null;
+        } else {
+          console.log('🔄 Retrying MongoDB Atlas connection in background...');
+          await connectDB();
+        }
+      }, 10000);
+    }
+  } finally {
+    isConnecting = false;
   }
 }
 
