@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://stocktracker-1-vzdk.onrender.com/api/:path*"
+      "destination": "https://stocktracker-2-efc7.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
